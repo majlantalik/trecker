@@ -1,0 +1,26 @@
+# Environment
+.env
+
+# Backend
+backend/build/
+backend/.gradle/
+backend/out/
+*.jar
+*.class
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
