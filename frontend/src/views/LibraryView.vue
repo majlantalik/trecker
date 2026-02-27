@@ -7,7 +7,7 @@
 
     <div class="library-layout">
       <aside class="filters-panel">
-        <LibraryFilters @update:filters="applyFilters" :initial-genre="initialGenre" />
+        <LibraryFilters @update:filters="applyFilters" :initial-genre="initialGenre" initial-status="LISTENED" />
       </aside>
 
       <div class="library-content">
@@ -210,7 +210,7 @@ function formatDate(iso: string) {
 
 <style scoped>
 .library-view {
-  height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
@@ -219,29 +219,33 @@ function formatDate(iso: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.75rem;
 }
 
 .view-header h1 {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  margin: 0;
 }
 
 .count {
-  color: var(--p-text-muted-color);
+  color: var(--tk-text-muted);
   font-weight: 400;
+  font-family: var(--tk-font-body);
+  letter-spacing: 0;
 }
 
 .library-layout {
   display: flex;
-  gap: 1.25rem;
+  gap: 1.5rem;
   flex: 1;
+  align-items: flex-start;
 }
 
 .filters-panel {
-  width: 220px;
+  width: 260px;
   flex-shrink: 0;
+  position: sticky;
+  top: 1rem;
 }
 
 .library-content {
@@ -258,7 +262,7 @@ function formatDate(iso: string) {
 .empty-state {
   text-align: center;
   padding: 4rem 2rem;
-  color: var(--p-text-muted-color);
+  color: var(--tk-text-muted);
 }
 
 .empty-icon {
@@ -267,20 +271,25 @@ function formatDate(iso: string) {
   margin-bottom: 1rem;
 }
 
-.table-art,
-.table-art-placeholder {
-  width: 40px;
-  height: 40px;
+/* ── Album art ── */
+.table-art {
+  width: 52px;
+  height: 52px;
   object-fit: cover;
-  border-radius: 3px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .table-art-placeholder {
-  background: var(--p-surface-700);
+  width: 52px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--tk-border);
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--p-text-muted-color);
+  color: var(--tk-text-muted);
 }
 
 .table-actions {
@@ -288,16 +297,69 @@ function formatDate(iso: string) {
   gap: 0.25rem;
 }
 
+/* ── DataTable deep overrides ── */
+.library-table :deep(table) {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.library-table :deep(thead th) {
+  font-family: var(--tk-font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tk-text-muted) !important;
+  background: var(--tk-surface) !important;
+  border-bottom: 1px solid var(--tk-border) !important;
+  padding: 0.875rem 1rem !important;
+  white-space: nowrap;
+}
+
+.library-table :deep(thead th:first-child) {
+  border-radius: 12px 0 0 0;
+}
+
+.library-table :deep(thead th:last-child) {
+  border-radius: 0 12px 0 0;
+}
+
+.library-table :deep(tbody tr) {
+  transition: background 0.15s ease;
+}
+
+.library-table :deep(tbody tr:hover td) {
+  background: rgba(0, 229, 176, 0.05) !important;
+}
+
+.library-table :deep(tbody tr:hover td:first-child) {
+  box-shadow: inset 3px 0 0 var(--tk-accent);
+}
+
+.library-table :deep(tbody td) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+  padding: 0.75rem 1rem !important;
+  color: var(--tk-text);
+}
+
+.library-table :deep(.p-datatable-table-container) {
+  border-radius: 14px;
+  border: 1px solid var(--tk-border);
+  overflow: hidden;
+  background: var(--tk-surface);
+}
+
+/* ── Grid view ── */
 .releases-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
 }
 
 .grid-pagination {
   grid-column: 1 / -1;
   display: flex;
   justify-content: center;
-  margin-top: 1rem;
+  margin-top: 1.25rem;
 }
 </style>

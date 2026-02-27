@@ -23,6 +23,7 @@ export interface ReleaseRequest {
   title: string
   releaseYear?: number
   albumArtUrl?: string
+  country?: string
   discoveryLink?: string
   streamingLinks?: Record<string, string>
   genres?: string[]

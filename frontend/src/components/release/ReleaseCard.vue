@@ -38,22 +38,24 @@ defineEmits<{ click: [release: Release] }>()
 <style scoped>
 .release-card {
   display: flex;
-  gap: 1rem;
-  padding: 0.75rem;
-  border: 1px solid var(--p-surface-700);
-  border-radius: 8px;
-  background: var(--p-surface-900);
+  gap: 1.125rem;
+  padding: 1.125rem;
+  border: 1px solid var(--tk-border);
+  border-radius: 14px;
+  background: var(--tk-surface);
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 
 .release-card:hover {
-  border-color: var(--p-primary-color);
+  border-color: rgba(0, 229, 176, 0.35);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 229, 176, 0.1);
+  transform: translateY(-1px);
 }
 
 .card-art {
-  width: 64px;
-  height: 64px;
+  width: 88px;
+  height: 88px;
   flex-shrink: 0;
 }
 
@@ -61,51 +63,65 @@ defineEmits<{ click: [release: Release] }>()
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
 .art-placeholder {
   width: 100%;
   height: 100%;
-  background: var(--p-surface-700);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--tk-border);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--p-text-muted-color);
+  color: var(--tk-text-muted);
+  font-size: 1.25rem;
 }
 
 .card-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .card-title {
+  font-family: var(--tk-font-display);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--tk-text);
+  letter-spacing: -0.01em;
 }
 
 .card-artist {
-  color: var(--p-text-muted-color);
-  font-size: 0.85rem;
-  margin-top: 0.15rem;
+  color: var(--tk-text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
 }
 
 .card-meta {
   display: flex;
   gap: 0.5rem;
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--p-text-muted-color);
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--tk-text-muted);
+  opacity: 0.7;
 }
 
 .card-genres {
   display: flex;
   gap: 0.35rem;
   flex-wrap: wrap;
+  margin-top: 0.45rem;
+}
+
+.card-rating {
   margin-top: 0.35rem;
 }
 
@@ -113,6 +129,6 @@ defineEmits<{ click: [release: Release] }>()
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 </style>

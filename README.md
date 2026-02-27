@@ -321,6 +321,7 @@ All endpoints are under `/api`. All endpoints except `/auth/**` require a valid 
 
 - [x] Tidal API integration (`openapi.tidal.com/v2`)
 - [x] Authentication (Spring Security + JWT, HttpOnly cookies, refresh token rotation)
+- [ ] Profile section (change email / password, account settings)
 - [ ] Notion CSV import
 - [ ] Export to CSV / JSON
 - [ ] Keyboard shortcuts

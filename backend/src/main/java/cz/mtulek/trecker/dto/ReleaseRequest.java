@@ -11,6 +11,7 @@ public record ReleaseRequest(
     @NotBlank @Size(max = 500) String title,
     Integer releaseYear,
     @Size(max = 2000) String albumArtUrl,
+    @Size(max = 100) String country,
     @Size(max = 2000) String discoveryLink,
     Map<String, String> streamingLinks,
     List<String> genres,

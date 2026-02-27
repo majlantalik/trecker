@@ -56,6 +56,8 @@ onMounted(async () => {
 <style scoped>
 .stats-view {
   max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .view-header {

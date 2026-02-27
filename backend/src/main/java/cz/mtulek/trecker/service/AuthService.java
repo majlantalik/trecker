@@ -32,6 +32,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final SecureRandom random = new SecureRandom();
 
     @Value("${trecker.jwt.refresh-expiration-days:30}")
     private int refreshExpirationDays;
@@ -67,9 +68,7 @@ public class AuthService {
     public Cookie[] refresh(String plainToken) {
         String hash = sha256Hex(plainToken);
         RefreshToken stored = refreshTokenRepository.findByTokenHash(hash)
-            .orElseThrow(() -> {
-                return new IllegalArgumentException("Invalid refresh token");
-            });
+            .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
 
         if (!stored.isValid()) {
             // Possible reuse attack — revoke all tokens for this user
@@ -92,7 +91,7 @@ public class AuthService {
         String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail());
 
         byte[] randomBytes = new byte[32];
-        new SecureRandom().nextBytes(randomBytes);
+        random.nextBytes(randomBytes);
         String plainRefreshToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         String tokenHash = sha256Hex(plainRefreshToken);
 

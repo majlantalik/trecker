@@ -123,8 +123,8 @@ async function handleFormSubmit(data: any) {
 .quick-add-bar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  max-width: 800px;
+  gap: 0.875rem;
+  width: 100%;
 }
 
 .input-wrapper {
@@ -137,7 +137,7 @@ async function handleFormSubmit(data: any) {
 .input-icon {
   position: absolute;
   left: 0.75rem;
-  color: var(--p-text-muted-color);
+  color: var(--tk-text-muted);
   pointer-events: none;
   z-index: 1;
 }

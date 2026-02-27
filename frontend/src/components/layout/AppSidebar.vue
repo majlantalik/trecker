@@ -1,35 +1,43 @@
 <template>
   <nav class="app-sidebar">
     <div class="sidebar-brand">
-      <span class="brand-icon">🎵</span>
+      <div class="brand-icon-wrap">
+        <i class="pi pi-headphones brand-icon" />
+      </div>
       <span class="brand-name">Trecker</span>
     </div>
 
+    <div class="nav-section-label">Navigation</div>
     <ul class="sidebar-nav">
       <li>
         <RouterLink to="/queue" class="nav-link" active-class="active">
-          <i class="pi pi-list" />
-          <span>Queue</span>
-          <Badge v-if="queueCount > 0" :value="queueCount" severity="secondary" />
+          <i class="pi pi-list nav-icon" />
+          <span class="nav-label">Queue</span>
+          <span v-if="queueCount > 0" class="nav-badge">{{ queueCount }}</span>
         </RouterLink>
       </li>
       <li>
         <RouterLink to="/library" class="nav-link" active-class="active">
-          <i class="pi pi-book" />
-          <span>Library</span>
+          <i class="pi pi-book nav-icon" />
+          <span class="nav-label">Library</span>
         </RouterLink>
       </li>
       <li>
         <RouterLink to="/stats" class="nav-link" active-class="active">
-          <i class="pi pi-chart-bar" />
-          <span>Stats</span>
+          <i class="pi pi-chart-bar nav-icon" />
+          <span class="nav-label">Stats</span>
         </RouterLink>
       </li>
     </ul>
 
     <div class="sidebar-user">
-      <span class="user-email">{{ authStore.user?.email }}</span>
-      <Button icon="pi pi-sign-out" text @click="handleLogout" v-tooltip.right="'Sign out'" />
+      <div class="user-info">
+        <div class="user-avatar">{{ userInitial }}</div>
+        <span class="user-email">{{ authStore.user?.email }}</span>
+      </div>
+      <button class="logout-btn" @click="handleLogout" title="Sign out">
+        <i class="pi pi-sign-out" />
+      </button>
     </div>
   </nav>
 </template>
@@ -37,8 +45,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import Badge from 'primevue/badge'
-import Button from 'primevue/button'
 import { useReleasesStore } from '@/stores/releases'
 import { useAuthStore } from '@/stores/auth'
 
@@ -47,6 +53,7 @@ const authStore = useAuthStore()
 const router = useRouter()
 
 const queueCount = computed(() => releasesStore.total)
+const userInitial = computed(() => authStore.user?.email?.[0]?.toUpperCase() ?? '?')
 
 onMounted(() => {
   releasesStore.fetchReleases({ status: 'QUEUED', size: 1 })
@@ -60,77 +67,210 @@ async function handleLogout() {
 
 <style scoped>
 .app-sidebar {
-  width: 220px;
+  width: 260px;
   min-height: 100vh;
-  background: var(--p-surface-900);
-  border-right: 1px solid var(--p-surface-700);
+  background: linear-gradient(180deg, #0c0d1a 0%, #08090e 100%);
+  border-right: 1px solid var(--tk-border);
   display: flex;
   flex-direction: column;
-  padding: 1rem 0;
+  padding: 0;
+  position: relative;
+  flex-shrink: 0;
 }
 
+/* Subtle accent line at the top */
+.app-sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--tk-accent) 50%, transparent 100%);
+  opacity: 0.6;
+}
+
+/* ── Brand ── */
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1.25rem 1.5rem;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--p-text-color);
+  gap: 0.75rem;
+  padding: 1.75rem 1.5rem 1.5rem;
+}
+
+.brand-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--tk-accent-dim);
+  border: 1px solid rgba(0, 229, 176, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px var(--tk-accent-glow);
 }
 
 .brand-icon {
-  font-size: 1.5rem;
+  font-size: 1rem;
+  color: var(--tk-accent);
+}
+
+.brand-name {
+  font-family: var(--tk-font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff 30%, var(--tk-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+/* ── Nav ── */
+.nav-section-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tk-text-muted);
+  padding: 0 1.5rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.6;
 }
 
 .sidebar-nav {
   list-style: none;
-  padding: 0;
+  padding: 0 0.875rem;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1.25rem;
-  color: var(--p-text-muted-color);
+  gap: 0.8rem;
+  padding: 0.75rem 1rem;
+  color: var(--tk-text-muted);
   text-decoration: none;
-  border-radius: 0;
-  transition: all 0.15s;
+  border-radius: 10px;
+  transition: all 0.18s ease;
   font-size: 0.95rem;
+  font-weight: 500;
+  position: relative;
 }
 
 .nav-link:hover {
-  background: var(--p-surface-800);
-  color: var(--p-text-color);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--tk-text);
 }
 
 .nav-link.active {
-  background: var(--p-primary-color);
-  color: var(--p-primary-contrast-color);
+  background: linear-gradient(135deg, rgba(0, 229, 176, 0.18), rgba(0, 229, 176, 0.06));
+  color: var(--tk-accent);
+  box-shadow: inset 0 0 0 1px rgba(0, 229, 176, 0.2);
 }
 
-.nav-link i {
-  width: 1rem;
+.nav-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  background: var(--tk-accent);
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 8px var(--tk-accent-glow);
 }
 
+.nav-icon {
+  font-size: 1rem;
+  width: 1.125rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.nav-label {
+  flex: 1;
+}
+
+.nav-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: var(--tk-accent);
+  color: #000;
+  border-radius: 999px;
+  padding: 0.1em 0.45em;
+  line-height: 1.5;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* ── User ── */
 .sidebar-user {
   margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem 0.75rem 1.25rem;
-  border-top: 1px solid var(--p-surface-700);
+  padding: 1rem 0.875rem 1.25rem;
+  border-top: 1px solid var(--tk-border);
+  gap: 0.5rem;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(0, 229, 176, 0.25), rgba(0, 229, 176, 0.08));
+  border: 1px solid rgba(0, 229, 176, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--tk-accent);
+  flex-shrink: 0;
+  font-family: var(--tk-font-display);
 }
 
 .user-email {
   font-size: 0.8rem;
-  color: var(--p-text-muted-color);
+  color: var(--tk-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 6px;
+  color: var(--tk-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tk-text);
+}
+
+.logout-btn i {
+  font-size: 0.875rem;
 }
 </style>

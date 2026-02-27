@@ -3,10 +3,14 @@
     <AppSidebar />
     <div class="app-main">
       <header class="app-header">
-        <QuickAddBar />
+        <div class="header-inner">
+          <QuickAddBar />
+        </div>
       </header>
       <main class="app-content">
-        <slot />
+        <div class="content-wrapper">
+          <slot />
+        </div>
       </main>
     </div>
   </div>
@@ -21,6 +25,7 @@ import QuickAddBar from '@/components/release/QuickAddBar.vue'
 .app-layout {
   display: flex;
   min-height: 100vh;
+  background: var(--tk-bg);
 }
 
 .app-main {
@@ -31,14 +36,36 @@ import QuickAddBar from '@/components/release/QuickAddBar.vue'
 }
 
 .app-header {
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--p-surface-700);
-  background: var(--p-surface-950);
+  border-bottom: 1px solid var(--tk-border);
+  background: var(--tk-header-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+}
+
+.header-inner {
+  width: 100%;
+  padding: 1rem 2.5rem;
 }
 
 .app-content {
   flex: 1;
-  padding: 1.5rem;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(ellipse 80% 40% at 60% -10%, rgba(0, 229, 176, 0.04) 0%, transparent 70%),
+              var(--tk-bg);
+}
+
+.content-wrapper {
+  width: 100%;
+  padding: 2.25rem 2.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 </style>

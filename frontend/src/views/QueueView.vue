@@ -129,25 +129,29 @@ async function pickRandom() {
 
 <style scoped>
 .queue-view {
+  flex: 1;
   max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .view-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
 }
 
 .view-header h1 {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  margin: 0;
 }
 
 .count {
-  color: var(--p-text-muted-color);
+  color: var(--tk-text-muted);
   font-weight: 400;
+  font-family: var(--tk-font-body);
+  letter-spacing: 0;
 }
 
 .loading-state {
@@ -159,7 +163,7 @@ async function pickRandom() {
 .empty-state {
   text-align: center;
   padding: 4rem 2rem;
-  color: var(--p-text-muted-color);
+  color: var(--tk-text-muted);
 }
 
 .empty-icon {

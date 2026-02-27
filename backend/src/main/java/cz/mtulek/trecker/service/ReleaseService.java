@@ -79,6 +79,7 @@ public class ReleaseService {
         release.setTitle(request.title());
         release.setReleaseYear(request.releaseYear());
         release.setAlbumArtUrl(request.albumArtUrl());
+        release.setCountry(request.country());
         release.setSpotifyId(request.spotifyId());
         release.setMusicbrainzId(request.musicbrainzId());
 
