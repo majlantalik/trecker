@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@primevue/themes": "^4.3.3",
@@ -21,8 +24,13 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vitest/ui": "^3.0.0",
+    "@vue/test-utils": "^2.4.0",
+    "axios-mock-adapter": "^2.1.0",
+    "happy-dom": "^16.0.0",
     "typescript": "~5.7.2",
     "vite": "^6.1.0",
+    "vitest": "^3.0.0",
     "vue-tsc": "^2.2.0"
   }
 }

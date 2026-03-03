@@ -41,10 +41,14 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
+  function updateDisplayName(name: string | null) {
+    if (user.value) user.value = { ...user.value, displayName: name }
+  }
+
   function $reset() {
     user.value = null
     loading.value = false
   }
 
-  return { user, loading, isAuthenticated, fetchMe, login, register, logout, $reset }
+  return { user, loading, isAuthenticated, fetchMe, login, register, logout, updateDisplayName, $reset }
 })

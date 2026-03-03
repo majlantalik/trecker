@@ -36,6 +36,9 @@ public class User implements UserDetails {
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
+    @Column(name = "display_name", length = 100)
+    private String displayName;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_USER"));

@@ -31,10 +31,13 @@
     </ul>
 
     <div class="sidebar-user">
-      <div class="user-info">
+      <RouterLink to="/profile" class="user-info" active-class="user-info--active">
         <div class="user-avatar">{{ userInitial }}</div>
-        <span class="user-email">{{ authStore.user?.email }}</span>
-      </div>
+        <div class="user-text">
+          <span class="user-name">{{ authStore.user?.displayName || authStore.user?.email }}</span>
+          <span v-if="authStore.user?.displayName" class="user-email">{{ authStore.user?.email }}</span>
+        </div>
+      </RouterLink>
       <button class="logout-btn" @click="handleLogout" title="Sign out">
         <i class="pi pi-sign-out" />
       </button>
@@ -53,7 +56,10 @@ const authStore = useAuthStore()
 const router = useRouter()
 
 const queueCount = computed(() => releasesStore.total)
-const userInitial = computed(() => authStore.user?.email?.[0]?.toUpperCase() ?? '?')
+const userInitial = computed(() => {
+  const u = authStore.user
+  return (u?.displayName?.[0] ?? u?.email?.[0])?.toUpperCase() ?? '?'
+})
 
 onMounted(() => {
   releasesStore.fetchReleases({ status: 'QUEUED', size: 1 })
@@ -225,6 +231,18 @@ async function handleLogout() {
   gap: 0.7rem;
   min-width: 0;
   flex: 1;
+  text-decoration: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+  transition: background 0.15s ease;
+}
+
+.user-info:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.user-info--active {
+  background: rgba(0, 229, 176, 0.08);
 }
 
 .user-avatar {
@@ -243,8 +261,23 @@ async function handleLogout() {
   font-family: var(--tk-font-display);
 }
 
-.user-email {
+.user-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-name {
   font-size: 0.8rem;
+  color: var(--tk-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.user-email {
+  font-size: 0.72rem;
   color: var(--tk-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;

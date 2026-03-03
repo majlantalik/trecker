@@ -104,7 +104,7 @@ trecker/
 │   └── src/main/
 │       ├── java/cz/mtulek/trecker/
 │       │   ├── config/          CorsConfig, WebClientConfig
-│       │   ├── controller/      ReleaseController, GenreController, StatsController
+│       │   ├── controller/      ReleaseController, GenreController, StatsController, AuthController, ProfileController
 │       │   ├── domain/          Release, Genre, ReleaseStatus, ReleaseType
 │       │   ├── dto/             Request/response records + stats DTOs
 │       │   ├── exception/       GlobalExceptionHandler, ResourceNotFoundException
@@ -124,7 +124,7 @@ trecker/
 │   ├── nginx.conf
 │   ├── vite.config.ts
 │   └── src/
-│       ├── api/                 axios.ts, releases.ts, genres.ts, stats.ts
+│       ├── api/                 axios.ts, releases.ts, genres.ts, stats.ts, auth.ts, profile.ts
 │       ├── components/
 │       │   ├── layout/          AppLayout, AppSidebar
 │       │   ├── library/         LibraryFilters, ViewToggle
@@ -134,9 +134,10 @@ trecker/
 │       │   └── stats/           ActivityChart, BreakdownChart,
 │       │                        TopRatedList, YearEndList
 │       ├── router/index.ts
-│       ├── stores/              releases.ts, genres.ts, stats.ts (Pinia)
+│       ├── stores/              releases.ts, genres.ts, stats.ts, auth.ts (Pinia)
 │       ├── types/index.ts
-│       └── views/               QueueView, LibraryView, StatsView, EntryView
+│       └── views/               QueueView, LibraryView, StatsView, EntryView,
+│                                ProfileView
 ├── docker-compose.yml           Dev stack (hot reload)
 ├── docker-compose.prod.yml      Production stack (built images)
 ├── .env.example                 Template for environment variables
@@ -253,7 +254,8 @@ backend/src/main/resources/db/changelog/
     ├── 003-add-indexes.sql
     ├── 004-create-users-table.sql
     ├── 005-create-refresh-tokens-table.sql
-    └── 006-add-user-id-to-releases.sql
+    ├── 006-add-user-id-to-releases.sql
+    └── 009-add-display-name-to-users.sql
 ```
 
 To add a new migration: create `NNN-description.sql` in `changes/` using the Liquibase formatted-SQL convention, then reference it in `db.changelog-master.yaml`.
@@ -269,8 +271,16 @@ All endpoints are under `/api`. All endpoints except `/auth/**` require a valid 
 | `POST` | `/auth/register` | Register a new account. Body: `{ email, password }`. Returns `201` + sets cookies. |
 | `POST` | `/auth/login` | Authenticate. Body: `{ email, password }`. Returns `200` + sets cookies. |
 | `POST` | `/auth/logout` | Revoke session. Returns `204` + clears cookies. |
-| `GET` | `/auth/me` | Returns current user `{ id, email }`. Returns `401` if unauthenticated. |
+| `GET` | `/auth/me` | Returns current user `{ id, email, displayName }`. Returns `401` if unauthenticated. |
 | `POST` | `/auth/refresh` | Rotate refresh token (reads `refresh_token` cookie). Returns `200` + sets new cookies. |
+
+#### Profile endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/profile` | Returns current user's profile `{ id, email, displayName, createdAt }`. |
+| `PATCH` | `/profile` | Update display name. Body: `{ displayName }` (nullable — pass `null` to clear). Returns updated profile. |
+| `POST` | `/profile/password` | Change password. Body: `{ currentPassword, newPassword }`. Returns `204`. Returns `400` if `currentPassword` is wrong. |
 
 #### Release endpoints
 
@@ -321,7 +331,7 @@ All endpoints are under `/api`. All endpoints except `/auth/**` require a valid 
 
 - [x] Tidal API integration (`openapi.tidal.com/v2`)
 - [x] Authentication (Spring Security + JWT, HttpOnly cookies, refresh token rotation)
-- [ ] Profile section (change email / password, account settings)
+- [x] Profile section (display name, change password)
 - [ ] Notion CSV import
 - [ ] Export to CSV / JSON
 - [ ] Keyboard shortcuts

@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/trecker_test"
+    username: "test"
+    password: "test"
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+trecker:
+  jwt:
+    secret: "test-secret-that-is-at-least-32-chars-long"
+    expiration-seconds: 900
+    refresh-expiration-days: 30
+  cookie:
+    secure: false
+  cors:
+    allowed-origins: "http://localhost:5173"
+  spotify:
+    client-id: ""
+    client-secret: ""
+    token-url: "http://mock-spotify/token"
+    api-base: "http://mock-spotify/v1"
+  musicbrainz:
+    api-base: "http://mock-mb/ws/2"
+    user-agent: "TreckerTest/1.0"
+  youtube:
+    api-key: ""
+    api-base: "http://mock-youtube/v3"
+  tidal:
+    client-id: ""
+    client-secret: ""
+    token-url: "http://mock-tidal/token"
+    api-base: "http://mock-tidal/v2"
+    country-code: "US"
