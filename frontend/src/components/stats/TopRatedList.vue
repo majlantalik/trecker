@@ -8,7 +8,7 @@
         <div class="item-info">
           <RouterLink :to="`/entry/${r.id}`" class="item-title">{{ r.artist }} – {{ r.title }}</RouterLink>
           <div class="item-meta">
-            <Rating :modelValue="r.rating!" :stars="5" readonly />
+            <HalfStarRating :modelValue="r.rating" readonly />
             <span v-if="r.releaseYear" class="year">{{ r.releaseYear }}</span>
           </div>
         </div>
@@ -20,7 +20,7 @@
 
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import Rating from 'primevue/rating'
+import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import type { Release } from '@/types'
 
 defineProps<{ releases: Release[] }>()

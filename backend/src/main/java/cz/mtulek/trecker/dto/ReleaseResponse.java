@@ -19,7 +19,7 @@ public record ReleaseResponse(
     String discoveryLink,
     Map<String, String> streamingLinks,
     String country,
-    Short rating,
+    Double rating,
     boolean didNotFinish,
     OffsetDateTime dateListened,
     String notes,

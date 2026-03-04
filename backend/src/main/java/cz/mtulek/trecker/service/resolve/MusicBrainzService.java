@@ -1,5 +1,6 @@
 package cz.mtulek.trecker.service.resolve;
 
+import cz.mtulek.trecker.dto.ResolvedMetadataDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -7,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -50,6 +52,38 @@ public class MusicBrainzService {
     }
 
     /**
+     * Search MusicBrainz for a release by query string.
+     * If the query contains " - ", splits into artist and release queries.
+     * Returns full ResolvedMetadataDto (no art, no genres, no streaming links).
+     */
+    public Mono<ResolvedMetadataDto> searchRelease(String query) {
+        String luceneQuery;
+        if (query.contains(" - ")) {
+            int sep = query.indexOf(" - ");
+            String artist = query.substring(0, sep).trim();
+            String release = query.substring(sep + 3).trim();
+            luceneQuery = "artist:\"" + artist + "\" AND release:\"" + release + "\"";
+        } else {
+            luceneQuery = "release:\"" + query + "\"";
+        }
+        log.debug("MusicBrainz: searchRelease('{}') luceneQuery='{}' — waiting 1100ms for rate limit", query, luceneQuery);
+        return Mono.delay(Duration.ofMillis(1100))
+            .flatMap(__ -> {
+                log.debug("MusicBrainz: querying release search: {}", luceneQuery);
+                return webClient.get()
+                    .uri(apiBase + "/release?query={q}&fmt=json&limit=1", luceneQuery)
+                    .header("User-Agent", userAgent)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .flatMap(body -> extractSearchedReleaseInfo(body))
+                    .onErrorResume(e -> {
+                        log.warn("MusicBrainz searchRelease failed for '{}': {}", query, e.getMessage());
+                        return Mono.empty();
+                    });
+            });
+    }
+
+    /**
      * Look up an artist by name to determine their country.
      */
     public Mono<String> lookupArtistCountry(String artistName) {
@@ -68,6 +102,50 @@ public class MusicBrainzService {
                         return Mono.empty();
                     });
             });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Mono<ResolvedMetadataDto> extractSearchedReleaseInfo(Map<?, ?> body) {
+        try {
+            var releases = (java.util.List<?>) body.get("releases");
+            if (releases == null || releases.isEmpty()) {
+                log.debug("MusicBrainz searchRelease: no releases in response");
+                return Mono.empty();
+            }
+            var first = (Map<String, Object>) releases.get(0);
+            String mbId = (String) first.get("id");
+            String title = (String) first.get("title");
+            String country = (String) first.get("country");
+
+            // Parse year from date field (first 4 chars)
+            Integer year = null;
+            String date = (String) first.get("date");
+            if (date != null && date.length() >= 4) {
+                try { year = Integer.parseInt(date.substring(0, 4)); } catch (Exception _) {}
+            }
+
+            // Extract artist from artist-credit
+            String artist = null;
+            var artistCredit = (java.util.List<?>) first.get("artist-credit");
+            if (artistCredit != null && !artistCredit.isEmpty()) {
+                var credit = (Map<?, ?>) artistCredit.get(0);
+                artist = (String) credit.get("name");
+                if (artist == null) {
+                    var artistObj = (Map<?, ?>) credit.get("artist");
+                    if (artistObj != null) artist = (String) artistObj.get("name");
+                }
+            }
+
+            log.debug("MusicBrainz searchRelease result: artist='{}', title='{}', year={}, country='{}', mbId='{}'",
+                artist, title, year, country, mbId);
+
+            if (artist == null && title == null) return Mono.empty();
+
+            return Mono.just(new ResolvedMetadataDto(artist, title, year, null, country, List.of(), Map.of(), null, mbId));
+        } catch (Exception e) {
+            log.debug("Failed to parse MusicBrainz search response: {}", e.getMessage());
+            return Mono.empty();
+        }
     }
 
     @SuppressWarnings("unchecked")

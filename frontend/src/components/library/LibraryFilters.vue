@@ -77,7 +77,12 @@
             <i class="pi pi-star" />
             Min Rating
           </label>
-          <Rating v-model="localFilters.ratingMin" :stars="5" :cancel="true" @change="emit" class="filter-rating" />
+          <HalfStarRating
+            :modelValue="localFilters.ratingMin ?? null"
+            :cancel="true"
+            @update:modelValue="v => { localFilters.ratingMin = v ?? undefined; emit() }"
+            class="filter-rating"
+          />
         </div>
 
         <div class="filter-item">
@@ -104,7 +109,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import AutoComplete from 'primevue/autocomplete'
-import Rating from 'primevue/rating'
+import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import Checkbox from 'primevue/checkbox'
 import { useGenresStore } from '@/stores/genres'
 import type { ReleaseFilterParams } from '@/types'

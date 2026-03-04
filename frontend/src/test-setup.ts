@@ -24,9 +24,9 @@ config.global.stubs = {
     props: ['modelValue', 'placeholder', 'min', 'max', 'useGrouping', 'fluid'],
     emits: ['update:modelValue']
   },
-  Rating: {
-    template: '<div data-stub="rating" :data-value="modelValue" @click="$emit(\'update:modelValue\', 5)"></div>',
-    props: ['modelValue', 'stars', 'cancel'],
+  HalfStarRating: {
+    template: '<div data-stub="half-star-rating" :data-value="modelValue" @click="$emit(\'update:modelValue\', 5)"></div>',
+    props: ['modelValue', 'readonly', 'cancel'],
     emits: ['update:modelValue']
   },
   Checkbox: {

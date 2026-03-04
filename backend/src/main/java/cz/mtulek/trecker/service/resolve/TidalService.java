@@ -146,6 +146,58 @@ public class TidalService {
         });
     }
 
+    @SuppressWarnings("unchecked")
+    public Mono<ResolvedMetadataDto> searchAlbum(String query) {
+        if (!isConfigured()) {
+            log.debug("Tidal not configured — skipping searchAlbum");
+            return Mono.empty();
+        }
+        log.debug("Tidal: searchAlbum('{}') countryCode={}", query, countryCode);
+
+        return getAccessToken().flatMap(token ->
+            webClient.get()
+                .uri(apiBase + "/albums/search?query={q}&countryCode={country}&include=artists,coverArt",
+                    query, countryCode)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .header(HttpHeaders.ACCEPT, TIDAL_MEDIA_TYPE)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .flatMap(body -> {
+                    var dataList = (List<?>) body.get("data");
+                    if (dataList == null || dataList.isEmpty()) {
+                        log.debug("Tidal searchAlbum: no results for '{}'", query);
+                        return Mono.<ResolvedMetadataDto>empty();
+                    }
+                    var albumData = (Map<?, ?>) dataList.get(0);
+                    var attrs = (Map<?, ?>) albumData.get("attributes");
+                    if (attrs == null) return Mono.<ResolvedMetadataDto>empty();
+
+                    String title = (String) attrs.get("title");
+                    Integer year = parseYear((String) attrs.get("releaseDate"));
+                    List<?> included = (List<?>) body.get("included");
+                    String artUrl = extractCoverArtUrl(included);
+                    String artist = extractArtistName(albumData, included);
+
+                    // Build Tidal URL from album id
+                    String albumId = (String) albumData.get("id");
+                    Map<String, String> streamingLinks = albumId != null
+                        ? Map.of("tidal", "https://tidal.com/browse/album/" + albumId)
+                        : Map.of();
+
+                    log.debug("Tidal searchAlbum resolved: artist='{}', title='{}', year={}", artist, title, year);
+                    return Mono.just(new ResolvedMetadataDto(
+                        artist, title, year, artUrl, null, List.of(), streamingLinks, null, null
+                    ));
+                })
+        ).onErrorResume(WebClientResponseException.class, e -> {
+            log.warn("Tidal searchAlbum failed for '{}': {} — body: {}", query, e.getMessage(), e.getResponseBodyAsString());
+            return Mono.empty();
+        }).onErrorResume(e -> {
+            log.warn("Tidal searchAlbum failed for '{}': {}", query, e.getMessage());
+            return Mono.empty();
+        });
+    }
+
     public Mono<ResolvedMetadataDto> resolve(String url) {
         log.debug("Tidal: extracting album ID from URL: {}", url);
         String albumId = extractAlbumId(url);

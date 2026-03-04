@@ -6,8 +6,8 @@ public record ReleaseFilterParams(
     ReleaseStatus status,
     String genre,
     String country,
-    Short ratingMin,
-    Short ratingMax,
+    Double ratingMin,
+    Double ratingMax,
     Integer year,
     Boolean didNotFinish,
     String search

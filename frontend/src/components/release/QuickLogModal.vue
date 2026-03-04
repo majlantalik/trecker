@@ -19,7 +19,7 @@
 
       <div class="log-field">
         <label>Rating</label>
-        <Rating v-model="form.rating" :stars="5" :cancel="true" />
+        <HalfStarRating v-model="form.rating" :cancel="true" />
       </div>
 
       <div class="log-field">
@@ -58,7 +58,7 @@ import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import Rating from 'primevue/rating'
+import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import Checkbox from 'primevue/checkbox'
 import Textarea from 'primevue/textarea'
 import InputText from 'primevue/inputtext'

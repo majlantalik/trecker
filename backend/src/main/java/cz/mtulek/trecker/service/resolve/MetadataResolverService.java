@@ -134,30 +134,53 @@ public class MetadataResolverService {
             });
     }
 
-    private Mono<ResolvedMetadataDto> resolveByQuery(String query) {
-        log.debug("resolveByQuery: '{}'", query);
-        Mono<ResolvedMetadataDto> spotifyMono = spotifyService.searchByQuery(query);
+    private static final ResolvedMetadataDto EMPTY_DTO =
+        new ResolvedMetadataDto(null, null, null, null, null, List.of(), Map.of(), null, null);
 
-        return spotifyMono.flatMap(spotify -> {
-            log.debug("Spotify search result: artist='{}', title='{}', spotifyId='{}'",
-                spotify.artist(), spotify.title(), spotify.spotifyId());
-            if (spotify.artist() != null) {
-                log.debug("Fetching MusicBrainz country for artist: '{}'", spotify.artist());
-                Mono<String> countryMono = musicBrainzService.lookupArtistCountry(spotify.artist());
-                return countryMono.defaultIfEmpty("").map(country -> {
-                    log.debug("MusicBrainz country for '{}': '{}'", spotify.artist(), country.isBlank() ? "(none)" : country);
-                    ResolvedMetadataDto merged = merge(spotify, country.isBlank() ? null : country, null);
-                    log.debug("Query resolution final: artist='{}', title='{}', country='{}'",
-                        merged.artist(), merged.title(), merged.country());
-                    return merged;
-                });
-            }
-            log.debug("Spotify result has no artist — skipping MusicBrainz lookup");
-            return Mono.just(spotify);
+    private Mono<ResolvedMetadataDto> resolveByQuery(String query) {
+        log.debug("resolveByQuery: '{}' — running MB + Spotify + Tidal in parallel", query);
+        Mono<ResolvedMetadataDto> mbMono      = musicBrainzService.searchRelease(query).onErrorReturn(EMPTY_DTO);
+        Mono<ResolvedMetadataDto> spotifyMono = spotifyService.searchByQuery(query).onErrorReturn(EMPTY_DTO);
+        Mono<ResolvedMetadataDto> tidalMono   = tidalService.searchAlbum(query).onErrorReturn(EMPTY_DTO);
+
+        return Mono.zip(
+            mbMono.defaultIfEmpty(EMPTY_DTO),
+            spotifyMono.defaultIfEmpty(EMPTY_DTO),
+            tidalMono.defaultIfEmpty(EMPTY_DTO)
+        ).flatMap(tuple -> {
+            ResolvedMetadataDto merged = mergeQueryResults(tuple.getT1(), tuple.getT2(), tuple.getT3());
+            log.debug("Query resolution merged: artist='{}', title='{}', country='{}', mbId='{}'",
+                merged.artist(), merged.title(), merged.country(), merged.musicbrainzId());
+            return (merged.artist() == null && merged.title() == null)
+                ? Mono.empty()
+                : Mono.just(merged);
         }).onErrorResume(e -> {
             log.warn("Query resolution failed for '{}': {}", query, e.getMessage());
             return Mono.empty();
         });
+    }
+
+    private ResolvedMetadataDto mergeQueryResults(ResolvedMetadataDto mb,
+                                                   ResolvedMetadataDto spotify,
+                                                   ResolvedMetadataDto tidal) {
+        // MB is authoritative for identity fields
+        String artist  = mb.artist()      != null ? mb.artist()      : spotify.artist();
+        String title   = mb.title()       != null ? mb.title()       : spotify.title();
+        Integer year   = mb.releaseYear() != null ? mb.releaseYear() : spotify.releaseYear();
+        String country = mb.country();
+        String mbId    = mb.musicbrainzId();
+
+        // Spotify provides art and genres
+        String artUrl       = spotify.albumArtUrl() != null ? spotify.albumArtUrl() : tidal.albumArtUrl();
+        List<String> genres = spotify.genres() != null ? spotify.genres() : List.of();
+        String spotifyId    = spotify.spotifyId();
+
+        // Merge streaming links from Spotify + Tidal
+        Map<String, String> links = new HashMap<>();
+        if (spotify.streamingLinks() != null) links.putAll(spotify.streamingLinks());
+        if (tidal.streamingLinks()   != null) links.putAll(tidal.streamingLinks());
+
+        return new ResolvedMetadataDto(artist, title, year, artUrl, country, genres, links, spotifyId, mbId);
     }
 
     private ResolvedMetadataDto merge(ResolvedMetadataDto base, String country, String musicbrainzId) {

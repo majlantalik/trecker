@@ -18,7 +18,7 @@
             {{ entry.release.artist }} – {{ entry.release.title }}
           </RouterLink>
           <div class="item-meta">
-            <Rating :modelValue="entry.release.rating!" :stars="5" readonly />
+            <HalfStarRating :modelValue="entry.release.rating" readonly />
           </div>
         </div>
       </div>
@@ -29,7 +29,7 @@
 
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import Rating from 'primevue/rating'
+import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import Button from 'primevue/button'
 import type { YearEndEntry } from '@/types'
 

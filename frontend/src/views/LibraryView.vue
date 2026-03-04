@@ -50,7 +50,7 @@
           <Column field="country" header="Country" style="width: 100px" />
           <Column field="rating" header="Rating" sortable style="width: 130px">
             <template #body="{ data }">
-              <Rating v-if="data.rating" :modelValue="data.rating" :stars="5" readonly />
+              <HalfStarRating v-if="data.rating" :modelValue="data.rating" readonly />
             </template>
           </Column>
           <Column field="dateListened" header="Listened" sortable style="width: 130px">
@@ -117,7 +117,7 @@ import { useRouter, useRoute } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
-import Rating from 'primevue/rating'
+import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import ProgressSpinner from 'primevue/progressspinner'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Paginator from 'primevue/paginator'

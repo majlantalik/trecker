@@ -17,7 +17,7 @@
         <Tag v-for="genre in release.genres.slice(0, 3)" :key="genre" :value="genre" severity="secondary" />
       </div>
       <div class="card-rating" v-if="release.rating">
-        <Rating :modelValue="release.rating" :stars="5" readonly />
+        <HalfStarRating :modelValue="release.rating" readonly />
       </div>
     </div>
     <div class="card-actions" @click.stop>
@@ -27,7 +27,7 @@
 </template>
 
 <script setup lang="ts">
-import Rating from 'primevue/rating'
+import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import Tag from 'primevue/tag'
 import type { Release } from '@/types'
 

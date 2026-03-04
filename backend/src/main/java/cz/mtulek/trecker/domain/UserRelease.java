@@ -32,7 +32,7 @@ public class UserRelease {
     @Column(nullable = false, length = 20)
     private ReleaseStatus status = ReleaseStatus.QUEUED;
 
-    private Short rating;
+    private Double rating;
 
     @Column(name = "did_not_finish", nullable = false)
     private boolean didNotFinish = false;

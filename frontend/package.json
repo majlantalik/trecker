@@ -12,6 +12,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@playwright/test": "^1.58.2",
     "@primevue/themes": "^4.3.3",
     "axios": "^1.7.9",
     "chart.js": "^4.4.7",

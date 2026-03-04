@@ -78,16 +78,35 @@ async function handleAdd() {
   await resolve(val, URL_PATTERN.test(val))
 }
 
+function parseQueryText(input: string): ResolvedMetadata | null {
+  const sep = input.indexOf(' - ')
+  if (sep === -1) return null
+  return {
+    artist: input.slice(0, sep).trim(),
+    title: input.slice(sep + 3).trim(),
+    releaseYear: null,
+    albumArtUrl: null,
+    country: null,
+    streamingLinks: {},
+    genres: []
+  }
+}
+
 async function resolve(value: string, isUrl: boolean) {
   resolving.value = true
   resolvedMetadata.value = null
   try {
     const request = isUrl ? { url: value } : { query: value }
     const metadata = await releasesApi.resolve(request)
-    resolvedMetadata.value = metadata
+    // If resolve succeeded but returned no identity for a plain query, fall back to parsed text
+    if (!isUrl && metadata && !metadata.artist && !metadata.title) {
+      resolvedMetadata.value = parseQueryText(value) ?? metadata
+    } else {
+      resolvedMetadata.value = metadata
+    }
   } catch (e) {
-    // Open form with empty prefill for manual entry
-    resolvedMetadata.value = null
+    // All resolvers failed — pre-fill from typed text as last resort
+    resolvedMetadata.value = isUrl ? null : parseQueryText(value)
   } finally {
     resolving.value = false
     showForm.value = true
