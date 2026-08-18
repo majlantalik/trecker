@@ -2,14 +2,33 @@
   <div class="quick-add-bar">
     <div class="input-wrapper">
       <i class="pi pi-plus-circle input-icon" />
-      <InputText
-        v-model="inputValue"
-        placeholder="Paste a Spotify/Tidal link or type an artist + album..."
-        class="quick-add-input"
-        @paste="handlePaste"
+      <AutoComplete
+        class="quick-add-ac"
+        v-model="acValue"
+        :suggestions="suggestions"
+        @complete="fetchSuggestions"
+        @item-select="handleCatalogSelect"
         @keydown.enter="handleEnter"
-        fluid
-      />
+        :pt="{
+          input: { onPaste: handlePaste },
+          panel: { style: 'background: var(--tk-surface); border: 1px solid var(--tk-border); border-radius: 10px;' },
+          option: { style: 'padding: 0.4rem 0.875rem;' }
+        }"
+        option-label="title"
+        placeholder="Paste a Spotify/Tidal link or type an artist + album..."
+        auto-highlight
+      >
+        <template #option="{ option }">
+          <div class="catalog-suggestion">
+            <img v-if="option.albumArtUrl" :src="option.albumArtUrl" class="suggestion-art" alt="" />
+            <div v-else class="suggestion-art-placeholder"><i class="pi pi-music" /></div>
+            <span class="suggestion-label">
+              {{ option.artist }} &mdash; {{ option.title }}
+              <span v-if="option.releaseYear" class="suggestion-year">({{ option.releaseYear }})</span>
+            </span>
+          </div>
+        </template>
+      </AutoComplete>
       <Button
         v-if="inputValue"
         icon="pi pi-times"
@@ -17,7 +36,7 @@
         rounded
         size="small"
         class="clear-btn"
-        @click="inputValue = ''"
+        @click="clearInput"
         aria-label="Clear"
       />
     </div>
@@ -39,8 +58,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import InputText from 'primevue/inputtext'
+import { ref, watch, onUnmounted } from 'vue'
+import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import ReleaseForm from './ReleaseForm.vue'
@@ -49,7 +68,9 @@ import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
 import type { ResolvedMetadata } from '@/types'
 
+const acValue = ref<string | ResolvedMetadata>('')
 const inputValue = ref('')
+const suggestions = ref<ResolvedMetadata[]>([])
 const resolving = ref(false)
 const showForm = ref(false)
 const resolvedMetadata = ref<ResolvedMetadata | null>(null)
@@ -57,12 +78,44 @@ const toast = useToast()
 const releasesStore = useReleasesStore()
 const genresStore = useGenresStore()
 
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+onUnmounted(() => { if (debounceTimer) clearTimeout(debounceTimer) })
+
+watch(acValue, (val) => { if (typeof val === 'string') inputValue.value = val })
+
 const URL_PATTERN = /^https?:\/\//
+
+async function fetchSuggestions(event: { query: string }) {
+  const q = event.query.trim()
+  if (q.length < 2 || URL_PATTERN.test(q)) { suggestions.value = []; return }
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(async () => {
+    try { suggestions.value = await releasesApi.searchCatalog(q) }
+    catch { suggestions.value = [] }
+  }, 300)
+}
+
+function handleCatalogSelect(event: { value: ResolvedMetadata }) {
+  resolvedMetadata.value = event.value
+  const label = `${event.value.artist} – ${event.value.title}`
+  acValue.value = label
+  inputValue.value = label
+  suggestions.value = []
+  showForm.value = true
+}
+
+function clearInput() {
+  acValue.value = ''
+  inputValue.value = ''
+  suggestions.value = []
+}
 
 async function handlePaste(event: ClipboardEvent) {
   const text = event.clipboardData?.getData('text') || ''
   if (URL_PATTERN.test(text)) {
     event.preventDefault()
+    acValue.value = text
     inputValue.value = text
     await resolve(text, true)
   }
@@ -125,7 +178,7 @@ async function handleFormSubmit(data: any) {
       detail: `${release.artist} – ${release.title}`,
       life: 3000
     })
-    inputValue.value = ''
+    clearInput()
     resolvedMetadata.value = null
   } catch (e: any) {
     toast.add({
@@ -161,7 +214,13 @@ async function handleFormSubmit(data: any) {
   z-index: 1;
 }
 
-.quick-add-input {
+.quick-add-ac {
+  flex: 1;
+  width: 100%;
+}
+
+.quick-add-ac :deep(input) {
+  width: 100%;
   padding-left: 2.25rem !important;
   padding-right: 2rem !important;
 }
@@ -169,5 +228,45 @@ async function handleFormSubmit(data: any) {
 .clear-btn {
   position: absolute;
   right: 0.25rem;
+}
+
+.catalog-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.suggestion-art {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.suggestion-art-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: rgba(226, 228, 240, 0.3);
+}
+
+.suggestion-label {
+  font-size: 0.875rem;
+  color: var(--tk-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-year {
+  color: rgba(226, 228, 240, 0.45);
+  font-size: 0.8rem;
 }
 </style>

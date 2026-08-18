@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -62,6 +63,14 @@ public class ReleaseController {
         Sort.Direction sortDir = Sort.Direction.fromOptionalString(direction).orElse(Sort.Direction.DESC);
         Pageable pageable = PageRequest.of(page, size, Sort.by(sortDir, sort));
         return releaseService.findAll(params, pageable, user.getId());
+    }
+
+    @GetMapping("/catalog")
+    public List<ResolvedMetadataDto> searchCatalog(
+        @RequestParam String q,
+        @RequestParam(defaultValue = "10") int limit
+    ) {
+        return releaseService.searchCatalog(q, limit);
     }
 
     @GetMapping("/random")

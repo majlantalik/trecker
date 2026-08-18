@@ -8,6 +8,7 @@ import cz.mtulek.trecker.dto.ReleaseFilterParams;
 import cz.mtulek.trecker.dto.ReleaseRequest;
 import cz.mtulek.trecker.dto.ReleaseResponse;
 import cz.mtulek.trecker.dto.ReleaseUpdateRequest;
+import cz.mtulek.trecker.dto.ResolvedMetadataDto;
 import cz.mtulek.trecker.exception.ResourceNotFoundException;
 import cz.mtulek.trecker.repository.ReleaseRepository;
 import cz.mtulek.trecker.repository.UserReleaseRepository;
@@ -16,6 +17,7 @@ import cz.mtulek.trecker.specification.UserReleaseSpecification;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -168,6 +170,26 @@ public class ReleaseService {
         UserRelease userRelease = userReleaseRepository.findByReleaseIdAndUserId(releaseId, userId)
             .orElseThrow(() -> new ResourceNotFoundException("Release not found: " + releaseId));
         userReleaseRepository.delete(userRelease);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ResolvedMetadataDto> searchCatalog(String q, int limit) {
+        if (q == null || q.isBlank()) return List.of();
+        Pageable pageable = PageRequest.of(0, Math.min(limit, 20));
+        return releaseRepository.searchCatalog(q.trim(), pageable)
+            .stream()
+            .map(r -> new ResolvedMetadataDto(
+                r.getArtist(),
+                r.getTitle(),
+                r.getReleaseYear(),
+                r.getAlbumArtUrl(),
+                r.getCountry(),
+                r.getGenres().stream().map(Genre::getName).sorted().toList(),
+                r.getStreamingLinks() != null ? Map.copyOf(r.getStreamingLinks()) : Map.of(),
+                r.getSpotifyId(),
+                r.getMusicbrainzId()
+            ))
+            .toList();
     }
 
     private Set<Genre> resolveGenres(List<String> genreNames) {

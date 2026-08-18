@@ -42,5 +42,10 @@ export const releasesApi = {
 
   async delete(id: string): Promise<void> {
     await api.delete(`/releases/${id}`)
+  },
+
+  async searchCatalog(q: string, limit = 10): Promise<ResolvedMetadata[]> {
+    const { data } = await api.get<ResolvedMetadata[]>('/releases/catalog', { params: { q, limit } })
+    return data
   }
 }

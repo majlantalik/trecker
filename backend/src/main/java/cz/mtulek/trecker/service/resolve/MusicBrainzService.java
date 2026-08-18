@@ -3,9 +3,11 @@ package cz.mtulek.trecker.service.resolve;
 import cz.mtulek.trecker.dto.ResolvedMetadataDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
 import java.util.List;
@@ -23,10 +25,12 @@ public class MusicBrainzService {
     @Value("${trecker.musicbrainz.user-agent}")
     private String userAgent;
 
-    public record MbReleaseInfo(String country, String musicbrainzId) {}
+    public record MbReleaseInfo(String country, String musicbrainzId, Integer releaseYear) {}
 
     public MusicBrainzService(WebClient.Builder webClientBuilder) {
-        this.webClient = webClientBuilder.build();
+        this.webClient = webClientBuilder
+            .clientConnector(new ReactorClientHttpConnector(HttpClient.create().followRedirect(true)))
+            .build();
     }
 
     /**
@@ -104,6 +108,55 @@ public class MusicBrainzService {
             });
     }
 
+    /**
+     * Fetch front cover art URL from the Cover Art Archive.
+     * Returns a 500px thumbnail URL (or full image as fallback).
+     * No rate-limit delay — CAA is a separate service from MusicBrainz API.
+     */
+    public Mono<String> fetchCoverArt(String mbid) {
+        log.debug("CoverArtArchive: fetching cover art for mbId='{}'", mbid);
+        return webClient.get()
+            .uri("https://coverartarchive.org/release/{mbid}", mbid)
+            .header("Accept", "application/json")
+            .retrieve()
+            .bodyToMono(Map.class)
+            .flatMap(this::extractCoverArtUrl)
+            .onErrorResume(e -> {
+                log.debug("CoverArtArchive: no art for mbId='{}': {}", mbid, e.getMessage());
+                return Mono.empty();
+            });
+    }
+
+    @SuppressWarnings("unchecked")
+    private Mono<String> extractCoverArtUrl(Map<?, ?> body) {
+        try {
+            var images = (List<?>) body.get("images");
+            if (images == null || images.isEmpty()) return Mono.empty();
+
+            // Find front image; fall back to first image
+            Map<?, ?> chosen = null;
+            for (Object img : images) {
+                var image = (Map<?, ?>) img;
+                if (chosen == null) chosen = image;
+                if (Boolean.TRUE.equals(image.get("front"))) { chosen = image; break; }
+            }
+            if (chosen == null) return Mono.empty();
+
+            var thumbnails = (Map<?, ?>) chosen.get("thumbnails");
+            if (thumbnails != null) {
+                for (String size : List.of("500", "250", "1200")) {
+                    String url = (String) thumbnails.get(size);
+                    if (url != null) { log.debug("CoverArtArchive: found {}px thumbnail", size); return Mono.just(url); }
+                }
+            }
+            String url = (String) chosen.get("image");
+            return url != null ? Mono.just(url) : Mono.empty();
+        } catch (Exception e) {
+            log.debug("Failed to parse Cover Art Archive response: {}", e.getMessage());
+            return Mono.empty();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private Mono<ResolvedMetadataDto> extractSearchedReleaseInfo(Map<?, ?> body) {
         try {
@@ -160,15 +213,18 @@ public class MusicBrainzService {
             var first = (Map<String, Object>) releases.get(0);
             String country = (String) first.get("country");
             String musicbrainzId = (String) first.get("id");
-            log.debug("MusicBrainz: first release — country='{}', mbId='{}'", country, musicbrainzId);
-            if (country != null && !country.isBlank()) {
-                return Mono.just(new MbReleaseInfo(country, musicbrainzId));
+
+            Integer year = null;
+            String date = (String) first.get("date");
+            if (date != null && date.length() >= 4) {
+                try { year = Integer.parseInt(date.substring(0, 4)); } catch (Exception _) {}
             }
+
+            log.debug("MusicBrainz: first release — country='{}', mbId='{}', year={}", country, musicbrainzId, year);
             if (musicbrainzId != null) {
-                log.debug("MusicBrainz: no country on first release, returning mbId only");
-                return Mono.just(new MbReleaseInfo(null, musicbrainzId));
+                return Mono.just(new MbReleaseInfo(country, musicbrainzId, year));
             }
-            log.debug("MusicBrainz: first release has neither country nor mbId");
+            log.debug("MusicBrainz: first release has no mbId");
         } catch (Exception e) {
             log.debug("Failed to parse MusicBrainz release response: {}", e.getMessage());
         }

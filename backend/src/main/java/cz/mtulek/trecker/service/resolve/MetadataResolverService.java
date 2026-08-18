@@ -69,7 +69,7 @@ public class MetadataResolverService {
         log.debug("Extracted Spotify album ID: {}", albumId);
 
         ResolvedMetadataDto empty = new ResolvedMetadataDto(null, null, null, null, null, List.of(), Map.of(), null, null);
-        MusicBrainzService.MbReleaseInfo emptyMb = new MusicBrainzService.MbReleaseInfo(null, null);
+        MusicBrainzService.MbReleaseInfo emptyMb = new MusicBrainzService.MbReleaseInfo(null, null, null);
 
         log.debug("Launching parallel Spotify + MusicBrainz lookup for albumId={}", albumId);
         Mono<ResolvedMetadataDto> spotifyMono = spotifyService.resolveAlbumById(albumId);
@@ -83,7 +83,7 @@ public class MetadataResolverService {
             MusicBrainzService.MbReleaseInfo mb = tuple.getT2();
             log.debug("Spotify result: artist='{}', title='{}', genres={}", spotify.artist(), spotify.title(), spotify.genres());
             log.debug("MusicBrainz result: country='{}', mbId='{}'", mb.country(), mb.musicbrainzId());
-            ResolvedMetadataDto merged = merge(spotify, mb.country(), mb.musicbrainzId());
+            ResolvedMetadataDto merged = merge(spotify, mb.country(), mb.musicbrainzId(), mb.releaseYear());
             log.debug("Merged result: artist='{}', title='{}', country='{}', mbId='{}'",
                 merged.artist(), merged.title(), merged.country(), merged.musicbrainzId());
             return merged;
@@ -104,7 +104,7 @@ public class MetadataResolverService {
                     .defaultIfEmpty("")
                     .map(country -> {
                         log.debug("MusicBrainz country for '{}': '{}'", tidal.artist(), country.isBlank() ? "(none)" : country);
-                        return merge(tidal, country.isBlank() ? null : country, null);
+                        return merge(tidal, country.isBlank() ? null : country, null, null);
                     });
             }
             log.debug("Tidal artist is blank — skipping MusicBrainz country lookup");
@@ -151,9 +151,19 @@ public class MetadataResolverService {
             ResolvedMetadataDto merged = mergeQueryResults(tuple.getT1(), tuple.getT2(), tuple.getT3());
             log.debug("Query resolution merged: artist='{}', title='{}', country='{}', mbId='{}'",
                 merged.artist(), merged.title(), merged.country(), merged.musicbrainzId());
-            return (merged.artist() == null && merged.title() == null)
-                ? Mono.empty()
-                : Mono.just(merged);
+            if (merged.artist() == null && merged.title() == null) return Mono.empty();
+            // Spotify/Tidal provided no art but we have an MB ID — try Cover Art Archive
+            if (merged.albumArtUrl() == null && merged.musicbrainzId() != null) {
+                log.debug("No art from Spotify/Tidal — fetching from Cover Art Archive for mbId='{}'", merged.musicbrainzId());
+                return musicBrainzService.fetchCoverArt(merged.musicbrainzId())
+                    .map(artUrl -> new ResolvedMetadataDto(
+                        merged.artist(), merged.title(), merged.releaseYear(),
+                        artUrl, merged.country(), merged.genres(),
+                        merged.streamingLinks(), merged.spotifyId(), merged.musicbrainzId()
+                    ))
+                    .defaultIfEmpty(merged);
+            }
+            return Mono.just(merged);
         }).onErrorResume(e -> {
             log.warn("Query resolution failed for '{}': {}", query, e.getMessage());
             return Mono.empty();
@@ -183,12 +193,12 @@ public class MetadataResolverService {
         return new ResolvedMetadataDto(artist, title, year, artUrl, country, genres, links, spotifyId, mbId);
     }
 
-    private ResolvedMetadataDto merge(ResolvedMetadataDto base, String country, String musicbrainzId) {
+    private ResolvedMetadataDto merge(ResolvedMetadataDto base, String country, String musicbrainzId, Integer mbYear) {
         Map<String, String> links = new HashMap<>(base.streamingLinks() != null ? base.streamingLinks() : Map.of());
         return new ResolvedMetadataDto(
             base.artist(),
             base.title(),
-            base.releaseYear(),
+            base.releaseYear() != null ? base.releaseYear() : mbYear,
             base.albumArtUrl(),
             country != null ? country : base.country(),
             base.genres(),
