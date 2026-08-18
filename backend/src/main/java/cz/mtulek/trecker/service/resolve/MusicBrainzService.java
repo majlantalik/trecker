@@ -6,8 +6,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 import java.util.List;
@@ -16,6 +18,14 @@ import java.util.Map;
 @Service
 @Slf4j
 public class MusicBrainzService {
+
+    /**
+     * MusicBrainz and Cover Art Archive occasionally reset the connection mid-handshake.
+     * Retry a couple of times on I/O-level failures only — never on a real HTTP error response.
+     */
+    private static final Retry TRANSIENT_ERROR_RETRY = Retry.backoff(2, Duration.ofMillis(500))
+        .maxBackoff(Duration.ofSeconds(2))
+        .filter(WebClientRequestException.class::isInstance);
 
     private final WebClient webClient;
 
@@ -47,6 +57,7 @@ public class MusicBrainzService {
                     .header("User-Agent", userAgent)
                     .retrieve()
                     .bodyToMono(Map.class)
+                    .retryWhen(TRANSIENT_ERROR_RETRY)
                     .flatMap(body -> extractReleaseInfo(body))
                     .onErrorResume(e -> {
                         log.warn("MusicBrainz lookupBySpotifyId failed: {}", e.getMessage());
@@ -79,6 +90,7 @@ public class MusicBrainzService {
                     .header("User-Agent", userAgent)
                     .retrieve()
                     .bodyToMono(Map.class)
+                    .retryWhen(TRANSIENT_ERROR_RETRY)
                     .flatMap(body -> extractSearchedReleaseInfo(body))
                     .onErrorResume(e -> {
                         log.warn("MusicBrainz searchRelease failed for '{}': {}", query, e.getMessage());
@@ -100,6 +112,7 @@ public class MusicBrainzService {
                     .header("User-Agent", userAgent)
                     .retrieve()
                     .bodyToMono(Map.class)
+                    .retryWhen(TRANSIENT_ERROR_RETRY)
                     .flatMap(body -> extractCountryFromArtists(body))
                     .onErrorResume(e -> {
                         log.warn("MusicBrainz lookupArtistCountry failed for '{}': {}", artistName, e.getMessage());
@@ -120,6 +133,7 @@ public class MusicBrainzService {
             .header("Accept", "application/json")
             .retrieve()
             .bodyToMono(Map.class)
+            .retryWhen(TRANSIENT_ERROR_RETRY)
             .flatMap(this::extractCoverArtUrl)
             .onErrorResume(e -> {
                 log.debug("CoverArtArchive: no art for mbId='{}': {}", mbid, e.getMessage());
