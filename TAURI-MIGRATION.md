@@ -299,7 +299,10 @@ New:
 - [x] DB file at Tauri's `app_data_dir()`, created on first run, migrations applied at startup
 
 Data migration from the existing Postgres instance:
-- [x] `scripts/import-from-postgres.py`
+- [x] **Not needed.** The Postgres database only ever held throwaway test rows on one
+      machine and was never deployed. The local database starts empty. An import script
+      was written and then deleted in commit `b0ad9a5`'s successor; recover it from there
+      if a populated database ever turns up.
 
 **Exit criterion: MET.** The database is created, migrated and opened on first launch.
 
@@ -331,16 +334,6 @@ or an ASCII-folded shadow column maintained at write time. Deferred, not forgott
 
 ### Deviations from the plan as written
 
-**The import script reads Postgres directly, not the REST API.** The plan wanted to go
-through `GET /api/releases` to avoid schema drift. There is no drift to avoid: the SQLite
-schema was written from the Postgres one and they are near-identical. Reading the database
-directly means the import needs no running backend, no login and no network, which makes
-it far likelier to still work months from now.
-
-**It handles the multi-account case.** If the old database holds more than one user it
-refuses to guess and asks for `--user`. Silently merging two people's tracking rows into
-one local library would be a quiet data corruption, not an inconvenience.
-
 **`updated_at` is on `user_releases` from the start**, per the Phase 6 note. Adding a
 `NOT NULL` column later to a populated table is meaningfully worse than carrying it now.
 
@@ -348,10 +341,10 @@ one local library would be a quiet data corruption, not an inconvenience.
 part of the release API, and it is how the table above was read. It also makes the
 Settings view honest about where the data actually lives.
 
-**The import script has not been run against real data.** There is no populated Postgres
-available here. Its conversion logic is unit-tested (timezone-offset timestamps to UTC
-RFC3339, Postgres `t`/`f` to 0/1, empty CSV fields to NULL) but the end-to-end path is
-unproven. Run it with `--dry-run` first.
+**The import script was written, then dropped.** It went through Postgres directly rather
+than the REST API, and handled the multi-account case. All of that turned out to be
+solving a problem that does not exist, so it is gone. Recorded here only so the deletion
+does not look like an oversight.
 
 ---
 
@@ -448,7 +441,13 @@ Conflict model, which the existing data model already gives us for free:
   This means `ProfileView.vue` is *not* deleted in Phase 1 as originally written. It is
   gutted and refilled. The Phase 1 checklist has been amended accordingly.
 
+- **The local database starts empty. No Postgres import.** The Postgres instance only ever
+  held throwaway test rows, on one machine, and was never deployed. Nothing is worth
+  carrying across.
+
 ## Open decisions
 
 1. Ship Spotify at all in v1, given it is on a deprecation path?
-2. Is the Postgres data import needed, or start the local DB empty?
+2. When Phase 3 moves reads onto SQLite, the ten seeded fixtures in `store.rs` go with it
+   and the app opens empty. Seed the database on first run with a few releases so the
+   views have something to show, or start genuinely empty?
