@@ -67,11 +67,22 @@ fn pick_image(body: &Value) -> Option<String> {
     if let Some(thumbnails) = chosen.get("thumbnails") {
         for size in ["500", "250", "1200"] {
             if let Some(url) = thumbnails.get(size).and_then(Value::as_str) {
-                return Some(url.to_string());
+                return Some(https(url));
             }
         }
     }
-    chosen.get("image").and_then(Value::as_str).map(String::from)
+    chosen.get("image").and_then(Value::as_str).map(https)
+}
+
+/// The Cover Art Archive hands out `http://` URLs in its JSON even though the same paths
+/// serve fine over TLS. Stored as-is they would be blocked outright by the app's
+/// content security policy, and every cover would silently fail to load. They are also
+/// saved to the database, so the scheme is fixed here rather than at render time.
+fn https(url: &str) -> String {
+    match url.strip_prefix("http://") {
+        Some(rest) => format!("https://{rest}"),
+        None => url.to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -118,5 +129,27 @@ mod tests {
         assert_eq!(pick_image(&json!({"images": []})), None);
         assert_eq!(pick_image(&json!({"images": "nope"})), None);
         assert_eq!(pick_image(&json!({"images": [{"front": true}]})), None);
+    }
+
+    #[test]
+    fn upgrades_plaintext_urls_to_tls() {
+        // The archive serves http:// in its JSON; the content security policy allows
+        // https: only, so an unfixed URL means no cover art at all.
+        let body = json!({"images": [{"front": true, "thumbnails": {"500":
+            "http://coverartarchive.org/release/abc/123-500.jpg"}}]});
+        assert_eq!(
+            pick_image(&body).as_deref(),
+            Some("https://coverartarchive.org/release/abc/123-500.jpg")
+        );
+
+        let full = json!({"images": [{"front": true, "image": "http://coverartarchive.org/x.jpg"}]});
+        assert_eq!(pick_image(&full).as_deref(), Some("https://coverartarchive.org/x.jpg"));
+    }
+
+    #[test]
+    fn leaves_urls_that_are_already_secure_alone() {
+        assert_eq!(https("https://example.org/a.jpg"), "https://example.org/a.jpg");
+        // Only the scheme prefix is rewritten, never the path.
+        assert_eq!(https("https://x.org/http://y"), "https://x.org/http://y");
     }
 }

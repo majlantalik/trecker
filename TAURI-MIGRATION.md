@@ -534,13 +534,58 @@ steps already degrade independently, which is what the trait was for.
 
 ## Phase 5 — Ship
 
-- [ ] Bundle targets: `.msi` and `.exe` (Windows), `.dmg` (macOS), `.deb` and `.AppImage` (Linux)
-- [ ] `tauri-plugin-updater` with a static JSON manifest on GitHub Releases
-- [ ] macOS signing and notarization (Apple Developer Program, annual fee)
-- [ ] Windows signing (certificate with hardware token; this complicates CI)
+Linux first and unsigned, by decision. macOS and Windows need paid certificates and are
+deferred; nothing in the build stops them being added later.
+
+- [x] Linux bundles: `.deb` and `.AppImage`
+- [x] Tighten the content security policy now that the external hosts are known
+- [x] Desktop entry and package metadata
+- [ ] `tauri-plugin-updater` with a manifest on GitHub Releases
+- [ ] macOS signing and notarization (Apple Developer Program, 99 USD/year)
+- [ ] Windows signing (certificate with hardware token; complicates CI)
 - [ ] GitHub Actions matrix build
 
-Budget real time for signing. It is the most commonly underestimated phase.
+### Artifacts
+
+| Bundle | Size |
+|---|---|
+| `Trecker_0.1.0_amd64.deb` | 3.8 MB |
+| `Trecker_0.1.0_amd64.AppImage` | 77 MB |
+
+The AppImage is twenty times larger because it carries its own GTK stack so it runs on any
+distribution. The `.deb` declares `libwebkit2gtk-4.1-0` and `libgtk-3-0` and uses the
+system's.
+
+Built with `npm run build` from the repo root. `.rpm` is in reach but needs `rpmbuild`
+installed, so it is left out of `targets` rather than failing the build.
+
+Neither format needs code signing. Linux has no Gatekeeper or SmartScreen equivalent, so
+these are shippable as they are.
+
+### The content security policy caught a real bug
+
+The policy was `null` since Phase 0. It is now:
+
+```
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+font-src 'self' data:; img-src 'self' data: blob: https: asset: http://asset.localhost;
+connect-src 'self' ipc: http://ipc.localhost; object-src 'none';
+base-uri 'self'; frame-ancestors 'none'
+```
+
+`img-src` deliberately allows any `https:` host, because a user can paste an artwork URL
+from anywhere and the risk in an image is small. Scripts and connections are locked down,
+which is where the risk actually is. `'unsafe-inline'` on styles is required by PrimeVue.
+
+Writing it exposed a bug that would have shipped: **the Cover Art Archive returns `http://`
+URLs in its JSON**, so with this policy every album cover would have been blocked, and
+without it every cover would have been fetched in plaintext. The same paths serve fine
+over TLS, so the resolver now upgrades the scheme before the URL is stored.
+
+### Not verified
+
+The artwork URL is now `https` and the policy permits it, but nobody has seen a cover
+actually paint. Screenshots are unavailable here. Worth one look.
 
 ---
 

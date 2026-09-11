@@ -23,12 +23,28 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:",
+        "img-src": "'self' data: blob: https: asset: http://asset.localhost",
+        "connect-src": "'self' ipc: http://ipc.localhost",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "frame-ancestors": "'none'"
+      }
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "appimage"],
+    "category": "Music",
+    "shortDescription": "Personal music library and listening tracker",
+    "longDescription": "Queue records you mean to hear, log them once you have, and see what you actually listened to. Everything is stored locally in a single SQLite file. Metadata comes from MusicBrainz and the Cover Art Archive; no account is required.",
+    "copyright": "Copyright (c) 2026 mtulek",
+    "publisher": "mtulek",
+    "homepage": "https://github.com/mtulek/trecker",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
