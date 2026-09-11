@@ -558,11 +558,10 @@ Conflict model, which the existing data model already gives us for free:
 
 ---
 
-## Stale docs to fix on the way through
+## Documentation
 
-- `CLAUDE.md` says "no automated tests yet". There are vitest suites in `api/`, `stores/`
-  and `components/release/`, plus Playwright as a dependency.
-- `CLAUDE.md` says the highest migration is `009`. It is `010-rating-decimal.sql`.
+`CLAUDE.md` and `README.md` were rewritten for the Tauri architecture after Phase 4. Both
+had described the Spring Boot web app, which no longer exists on this branch.
 
 ## Decisions taken
 
@@ -586,4 +585,4 @@ Conflict model, which the existing data model already gives us for free:
 
 ## Open decisions
 
-1. Ship Spotify at all in v1, given it is on a deprecation path?
+None outstanding. Next up is Phase 5.

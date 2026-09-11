@@ -2,104 +2,170 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+Trecker is a **local-first Tauri 2 desktop app**: a Vue 3 frontend in a native webview,
+a Rust core, and a SQLite file on the user's machine. There is no server and no account.
+
+It used to be a Spring Boot web app. `backend/` is still here but **frozen** — see
+[TAURI-MIGRATION.md](TAURI-MIGRATION.md) for what moved and why. Do not add features
+there; it exists as the starting point for an optional sync server.
+
 ## Development environment
 
-The primary dev environment is Docker Compose — no local Java/Node required to run the app.
+Everything runs from the repo root. There is no Docker in the loop any more.
 
 ```bash
-docker compose up                   # start all services (db, backend, frontend)
-docker compose restart frontend     # restart only frontend (after frontend changes)
-docker compose logs -f backend      # tail backend logs
-docker compose logs -f frontend     # tail frontend logs
+npm install            # installs the Tauri CLI at the root, once
+npm run dev            # Vite + the Tauri window, hot reload
+npm run build          # production bundle
+npm run build:nobundle # production binary only, much faster
+npm test               # frontend tests
+cargo test --manifest-path src-tauri/Cargo.toml --lib   # Rust tests
 ```
 
-After making frontend changes: restart the frontend container, then verify at http://localhost:5173 using Playwright MCP.
+**Linux needs the webview headers** before anything will compile:
 
-**Local builds** (without Docker):
 ```bash
-# Backend — must use Java 25
-JAVA_HOME=/home/mtulek/.sdkman/candidates/java/25.0.2-amzn ./gradlew build -x test  # from backend/
-JAVA_HOME=/home/mtulek/.sdkman/candidates/java/25.0.2-amzn ./gradlew bootRun        # from backend/
-
-# Frontend
-npm install && npm run dev    # from frontend/
-npm run build                 # production build
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
+  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev \
+  build-essential curl wget file libssl-dev pkg-config
 ```
 
-There are no automated tests yet.
+Use `cargo check` while iterating; a full `cargo build` writes gigabytes to
+`src-tauri/target/`.
 
-## Data model: two-table split
+### Tests
 
-The core architecture is a **shared catalog / per-user tracking split**:
+44 Rust tests and 30 frontend tests. The Rust integration tests in
+`src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
+real migration, so they catch actual SQL errors.
 
-- `releases` — deduplicated catalog. Keyed by `spotify_id` or `musicbrainz_id` (both UNIQUE). Holds: artist, title, year, artwork, country, genres, streaming links.
-- `user_releases` — per-user tracking row. Holds: status (`QUEUED`/`LISTENED`), rating, notes, `did_not_finish`, `date_listened`, `discovery_link`.
+Three network tests hit the live MusicBrainz and Cover Art Archive services and are
+excluded from normal runs:
 
-Every API response merges both via `ReleaseResponse.from(Release, UserRelease)` — this is the only factory method. There is no single-argument version.
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored --test-threads=1
+```
 
-**Delete** removes only the `user_releases` row; the catalog `releases` row stays.
+`--test-threads=1` is required: the MusicBrainz rate limiter lives on the `Resolver` and
+each test builds its own, so parallel runs trip the limit and get a 503.
 
-**Deduplication on create**: `ReleaseService.create()` first looks up by `spotify_id`/`musicbrainz_id`. On concurrent inserts it catches `DataIntegrityViolationException` and retries the lookup.
+## Architecture
 
-## Backend architecture
+```
+frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api/.
+src-tauri/    The Rust core.
+  migrations/ sqlx migrations, replacing Liquibase
+  src/
+    commands.rs   the #[tauri::command] surface, 15 commands
+    db.rs         pool, pragmas, migration runner, DbInfo diagnostics
+    domain.rs     wire types, mirroring frontend/src/types/index.ts
+    error.rs      AppError, serialized to the frontend as { code, message }
+    repo/         sqlx queries; filter.rs is the UserReleaseSpecification port
+    resolve/      MusicBrainz + Cover Art Archive
+backend/      FROZEN. Spring Boot, kept only for a future sync server.
+```
 
-Package root: `cz.mtulek.trecker` → `backend/src/main/java/cz/mtulek/trecker/`
+### The command boundary
 
-| Package | Purpose |
-|---|---|
-| `domain/` | JPA entities: `Release`, `UserRelease`, `User`, `Genre`, enums |
-| `dto/` | Request/response records + stats DTOs |
-| `controller/` | `ReleaseController`, `GenreController`, `StatsController`, `AuthController`, `ProfileController` |
-| `service/` | Business logic; `resolve/` sub-package for metadata fetching |
-| `service/resolve/` | `MetadataResolverService` (dispatcher), `SpotifyService`, `MusicBrainzService`, `TidalService`, `YouTubeService` |
-| `specification/` | `UserReleaseSpecification` — JPA Criteria API for filtered queries; roots in `UserRelease`, INNER JOINs to `Release`; always call `query.distinct(true)` when joining genres |
-| `security/` | `SecurityConfig`, `JwtAuthFilter`, `JwtService`, `AuthService` |
-| `repository/` | Spring Data repos: `ReleaseRepository`, `UserReleaseRepository`, `UserRepository`, `GenreRepository` |
+The frontend's only contact with the core is `frontend/src/api/*.ts`, about 170 lines.
+Every function there maps 1:1 onto a Rust command, and `frontend/src/api/commands.test.ts`
+asserts every command name and argument key, so a rename on either side fails in CI.
 
-**Metadata resolution flow**: `POST /releases/resolve` → `MetadataResolverService` detects input type (Spotify URL, Tidal URL, YouTube URL, plain text) → dispatches to appropriate service → returns `ResolvedMetadata`. Spotify + MusicBrainz calls run in parallel via `Mono.zip()` with an 8s timeout. MusicBrainz requires `User-Agent` header and has a 1100ms rate-limit delay built in.
+The Pinia stores and all views go through that layer and know nothing about Tauri. **Keep
+it that way.** If a view starts importing `invoke` directly, the seam has leaked.
 
-**Security**: Stateless JWT. `access_token` cookie (15 min, path=/api) + `refresh_token` cookie (30d, path=/api/auth/refresh). SHA-256 of refresh token stored in DB. `User implements UserDetails` directly — `@AuthenticationPrincipal User user` works in controllers. `DaoAuthenticationProvider` requires `UserDetailsService` passed to its constructor (Spring Security 7 removed the no-arg constructor).
+### Data model: two-table split
 
-**Profile**: `ProfileController` exposes `GET /profile`, `PATCH /profile` (update `displayName`), and `POST /profile/password` (change password; returns `400` if current password wrong). `UserDto` includes `displayName: string | null`. The auth store's `updateDisplayName()` action updates the sidebar reactively without a page reload.
+Preserved from the web app even though there is exactly one local user, because it is what
+would make sync tractable later:
 
-**CORS**: Configured in `SecurityConfig.corsConfigurationSource()` only. No separate `CorsConfig` bean. `allowCredentials(true)` means wildcard `*` origins are forbidden; use explicit origins in `CORS_ALLOWED_ORIGINS`.
+- `releases` — deduplicated catalog, keyed by `spotify_id` or `musicbrainz_id` (both
+  UNIQUE). Content-addressed, so these rows cannot conflict between devices.
+- `user_releases` — per-user tracking. Status, rating, notes, `did_not_finish`,
+  `date_listened`, `discovery_link`. Carries `user_id` (a local sentinel) and `updated_at`
+  purely so sync would not need a schema change.
 
-## Frontend architecture
+**Delete removes only the `user_releases` row.** The catalog row stays.
 
-Framework: Vue 3 + Vite + PrimeVue 4 (Aura theme) + Pinia + Axios
+The `id` in every API response is the **catalog release id**, not the tracking row id.
+`created_at` comes from the **tracking row**, because it means "when you added this".
 
-| Layer | Files |
-|---|---|
-| API | `src/api/axios.ts` (base client), `releases.ts`, `genres.ts`, `stats.ts`, `auth.ts`, `profile.ts` |
-| Stores | `src/stores/releases.ts`, `genres.ts`, `stats.ts`, `auth.ts` (Pinia) |
-| Types | `src/types/index.ts` — single source of truth for all TS interfaces |
-| Views | `QueueView`, `LibraryView`, `StatsView`, `EntryView`, `LoginView`, `RegisterView`, `ProfileView` |
-| Components | `release/` (QuickAddBar, ReleaseForm, QuickLogModal, GenreTagInput), `stats/` charts |
+### Metadata resolution
 
-**Auth flow**: `fetchMe()` is called before `app.mount()` in `main.ts` so the auth store is populated before the router guard runs. The Axios interceptor in `axios.ts` silently calls `/auth/refresh` on any 401, then retries the original request. It uses a dynamic import for the auth store to avoid a circular dependency (auth store → axios → auth store).
+`releases_resolve` → `resolve/mod.rs` → MusicBrainz for identity and genres, Cover Art
+Archive for artwork, both best-effort.
 
-**API base URL**: In dev, Vite proxies `/api` → `http://backend:8080` (set in `vite.config.ts`). `VITE_API_BASE_URL` is only used for production image builds.
-
-## Database migrations
-
-Liquibase manages schema. Migrations run automatically on startup. To add one:
-1. Create `backend/src/main/resources/db/changelog/changes/NNN-description.sql` using Liquibase formatted-SQL.
-2. Add the include entry to `db.changelog-master.yaml`.
-
-Current highest migration: `009-add-display-name-to-users.sql`.
+**Spotify, Tidal and YouTube are link-only and will stay that way.** All three need a
+credential that cannot ship in a binary. A pasted streaming URL is saved as a link with
+sharing parameters stripped; nothing is queried through it. Bandcamp and Apple Music put
+the artist and album in the URL path, so those are read and searched.
 
 ## Key gotchas
 
-- **Gradle 9.0 required**: Spring Boot 4.0.0 + Java 25. The committed wrapper (`./gradlew`) is already Gradle 9.0.
-- **`primeicons` is a separate package** — must be listed in `package.json` explicitly.
-- **`@primevue/themes` 4.5.x**: deprecated upstream but Aura theme still works; do not migrate to `@primeuix/themes` yet.
-- **`UserReleaseSpecification`**: always use `query.distinct(true)` when the spec joins genres to prevent duplicate rows.
-- **`ReleaseResponse.from(Release, UserRelease)`**: the only factory — always requires both arguments.
+**Never `cargo build --release` to produce a shippable binary.** It bypasses the Tauri CLI
+and leaves `devUrl` embedded, so the binary tries to reach localhost:5173. Use
+`npm run build`.
 
-## Environment setup
+**The Tauri CLI must run from the repo root.** It only searches subfolders, so it cannot
+find `src-tauri/` from inside `frontend/`. `beforeDevCommand` and `beforeBuildCommand`
+also resolve from the root, not from `src-tauri/`.
 
-Copy `.env.example` to `.env`. Required variables:
-- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
-- `JWT_SECRET` — generate with `openssl rand -base64 32` (≥32 bytes)
-- `CORS_ALLOWED_ORIGINS` — e.g. `http://localhost:5173`
-- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` — recommended for metadata resolution
+**The sort whitelist in `repo/filter.rs` is load-bearing.** `sort` is a client-supplied
+string. JPA used to make that safe and raw SQL does not. Anything not on the list is an
+error, never a fallback.
+
+**Genre filtering uses `EXISTS`, not a join.** The old `query.distinct(true)` gotcha does
+not carry over, and reintroducing a join would bring it back.
+
+**Text sorting uses `COLLATE NOCASE`,** because SQLite's default collation puts every
+capital before every lowercase letter.
+
+**`ORDER BY` always needs the `ur.id` tiebreaker.** Without it, rows equal on the sort
+column swap between page fetches and a release appears on two pages.
+
+**FTS5 is for catalog autocomplete only.** The library filter box uses substring `LIKE`,
+because FTS matches whole tokens and would stop finding "phere" inside "Stratosphere".
+
+**Never pass user input to FTS5 raw.** It has its own query language; `resolve/filter.rs`
+quotes every token and appends `*`.
+
+**SQLite pragmas are per-connection.** Checking them from a separate reader tells you
+nothing about the app's pool. Use the Settings view's Database section, which reads them
+on a pool connection.
+
+**MusicBrainz needs a real `User-Agent` and one request per second.** The limiter is a gate
+over the last-request time on a single `Resolver` instance managed by Tauri. Do not
+construct a second one.
+
+**`primeicons` is a separate package** and must stay listed in `package.json`.
+
+**`@primevue/themes` 4.5.x** is deprecated upstream but the Aura theme still works; do not
+migrate to `@primeuix/themes` yet.
+
+## Database
+
+sqlx migrations in `src-tauri/migrations/`, applied at startup. The file lives in Tauri's
+`app_data_dir()`: `~/.local/share/cz.mtulek.trecker/trecker.db` on Linux, `%APPDATA%` on
+Windows, `~/Library/Application Support` on macOS.
+
+To add a migration, drop `NNNN_description.sql` into `src-tauri/migrations/`. sqlx picks it
+up by filename order; there is no master file to edit.
+
+Current: `0001_initial.sql`.
+
+**Known limitation:** the FTS tokenizer folds accents but not ligatures, so `ros` finds
+*Sigur Rós* while `agaetis` does not find *Ágætis byrjun*. That is unicode61 as documented.
+
+## Verifying UI changes
+
+There is no browser to point Playwright at. Build with `npm run build:nobundle`, run
+`src-tauri/target/release/trecker`, and read the accessibility tree:
+
+```bash
+orca-ide computer get-app-state --app trecker --no-screenshot --json
+```
+
+On Wayland, screenshots need a desktop portal grant that is not available to automation,
+and keyboard input needs window focus that cannot be taken. The accessibility tree is the
+reliable channel — values render into it from `<p>` elements but not from `<div>`s, which
+is why the Settings rows are paragraphs.

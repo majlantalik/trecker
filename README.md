@@ -1,8 +1,10 @@
 # Trecker
 
-A personal music library and listening tracker. Discover releases via links (Spotify, YouTube, Tidal, Discord), queue them, listen on your streaming platform of choice, then log them with rating, genres, country, and notes.
+A personal music library and listening tracker. Queue records you mean to hear, log them
+once you have, and see what you actually listened to.
 
-Replaces a two-Notion-page workflow with a single purpose-built tool.
+It runs on your machine and stores everything in a single SQLite file you own. No account,
+no server, no network required to use it.
 
 **Core flow:** Quick Add → Queue → Mark as Listened → Library
 
@@ -12,59 +14,77 @@ Replaces a two-Notion-page workflow with a single purpose-built tool.
 
 ### Adding releases
 
-Paste a link or type a search query into the **Quick Add** bar at the top of any page.
+Type into the **Quick Add** bar at the top of any page.
 
-- **Spotify album link** — metadata (artist, title, year, artwork, genres) is fetched automatically from Spotify. Country of origin is looked up from MusicBrainz.
-- **YouTube link** — title is parsed and used to search Spotify for full metadata.
-- **Plain text** (e.g. `Portishead Dummy`) — searched on Spotify directly.
-- **Tidal album link** — metadata (artist, title, year, artwork) is fetched via the Tidal API. Country of origin is looked up from MusicBrainz. Requires `TIDAL_CLIENT_ID` and `TIDAL_CLIENT_SECRET`.
-- **Any other link** — form opens for manual entry.
+- **Artist and album** (`Slint - Spiderland`) — looked up on MusicBrainz. Artist, title,
+  the album's original release year, country and genres come back filled in, with cover
+  art from the Cover Art Archive.
+- **Just an album title** — the same lookup, less precisely.
+- **A Bandcamp or Apple Music link** — the artist and album are read out of the URL and
+  searched, and the link is saved.
+- **A Spotify, Tidal or YouTube link** — the link is saved, but nothing is looked up
+  through it. See below.
+- **Anything else** — the form opens for manual entry.
 
-After resolution, a pre-filled form opens. Review the data, adjust anything, and click **Add to Queue**.
+A pre-filled form opens either way. Adjust anything, then **Add to Queue**.
+
+Existing releases in your library appear as suggestions while you type, so adding
+something you already have does not create a duplicate.
+
+### Why streaming links are not resolved
+
+Spotify, Tidal and YouTube all require a developer credential to query, and a credential
+shipped inside a desktop app is not a credential. The alternative would be asking you to
+hold a paid subscription and register your own developer app before adding an album, which
+is not a reasonable thing to ask.
+
+So Trecker keeps the link and looks nothing up. Sharing parameters like `si=` are stripped
+first, since they identify whoever sent you the link.
+
+MusicBrainz and the Cover Art Archive need no account at all, which is why they do the
+work.
 
 ### Queue
 
-The **Queue** view lists everything you haven't listened to yet.
+Everything you have not listened to yet.
 
-- Click **Log** on any entry to open the Quick Log modal and mark it as listened.
-- Click **Pick one for me** to randomly select a queued release.
-- Click the title/artwork to open the full Entry page.
+- **Log** opens the Quick Log modal.
+- **Pick one for me** chooses a queued release at random.
+- The title opens the full Entry page.
 
-### Quick Log modal
-
-When marking a release as listened, you can optionally fill in:
+### Quick Log
 
 | Field | Description |
 |---|---|
-| Rating | 1–5 stars |
-| Genres | Pre-filled from Spotify; editable |
-| Country | Pre-filled from MusicBrainz; editable |
-| Notes | Free-text thoughts |
-| Did not finish | Flag for abandoned listens |
+| Rating | half-stars, 0.5 to 5 |
+| Genres | pre-filled from MusicBrainz, editable |
+| Country | pre-filled, editable |
+| Notes | free text |
+| Did not finish | for abandoned listens |
 
-Click **Log it** to save and return, or **Log + Details** to save and navigate to the full Entry page for more editing.
+**Log it** saves and returns; **Log + Details** saves and opens the Entry page.
 
 ### Library
 
-The **Library** view shows all listened releases. Switch between table and grid layout using the toggle in the top-right.
-
-Filter by:
-- Free-text search (artist or title)
-- Status (Queued / Listened)
-- Genre
-- Release type (Album, EP, Single, …)
-- Country
-- Year
-- Minimum rating
-- Did-not-finish flag
+Everything you have listened to, as a table or a grid. Filter by free-text search, status,
+genre, country, year, rating range and the did-not-finish flag.
 
 ### Stats
 
-The **Stats** view shows:
-- **Listening activity** — bar chart of albums logged per month
-- **Breakdowns** — doughnut charts by genre, country, and release type
-- **Top rated** — your highest-rated releases
-- **Year-end list** — ranked list for any year, navigable with the year selector
+Listening activity by month, breakdowns by genre and country, your top-rated releases, and
+a ranked year-end list for any year.
+
+### Where your data lives
+
+One SQLite file:
+
+| Platform | Path |
+|---|---|
+| Linux | `~/.local/share/cz.mtulek.trecker/trecker.db` |
+| macOS | `~/Library/Application Support/cz.mtulek.trecker/trecker.db` |
+| Windows | `%APPDATA%\cz.mtulek.trecker\trecker.db` |
+
+Settings shows the exact path. Back it up by copying the file while the app is closed.
 
 ---
 
@@ -74,264 +94,160 @@ The **Stats** view shows:
 
 | Layer | Technology |
 |---|---|
-| Backend | Spring Boot 4.0.0 / Java 25 / Gradle 9.0 (Kotlin DSL) |
+| Shell | Tauri 2 (system webview, ~4 MB binary) |
 | Frontend | Vue 3 + Vite + PrimeVue 4 (Aura theme) |
-| State management | Pinia |
-| HTTP client | Axios |
-| Database | PostgreSQL 17 |
-| DB migrations | Liquibase |
+| State | Pinia |
+| Core | Rust |
+| Database | SQLite via sqlx, with FTS5 |
+| HTTP | reqwest (rustls) |
 | Charts | vue-chartjs + Chart.js |
-| Containerisation | Docker Compose |
 
-Authentication: multi-user email/password with HttpOnly cookie-based JWT tokens and refresh token rotation.
+The frontend talks to Rust through Tauri commands. There is no HTTP API and no auth layer.
 
 ### Prerequisites
 
 | Tool | Version |
 |---|---|
-| Java | 25 (via sdkman: `sdk install java 25.0.2-amzn`) |
+| Rust | 1.77+ (1.95 in use) |
 | Node.js | 20+ |
-| Docker + Docker Compose | any recent version |
-| Gradle | not required locally — the wrapper (`./gradlew`) is committed |
+
+On Linux, the webview development headers:
+
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
+  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev \
+  build-essential curl wget file libssl-dev pkg-config
+```
+
+### Running
+
+All commands from the repo root.
+
+```bash
+npm install            # Tauri CLI, once
+npm run dev            # Vite + the Tauri window, hot reload
+npm run build          # production bundle (.deb, .AppImage, .dmg, .msi)
+npm run build:nobundle # production binary only, faster
+```
+
+> `cargo build --release` on its own produces a binary that tries to reach the dev server.
+> Always build through the Tauri CLI.
+
+### Tests
+
+```bash
+npm test                                                 # 30 frontend tests
+cargo test --manifest-path src-tauri/Cargo.toml --lib    # 44 Rust tests
+```
+
+The Rust integration tests run against a real temporary SQLite file through the real
+migration. Three further tests hit the live MusicBrainz and Cover Art Archive services and
+are excluded by default:
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored --test-threads=1
+```
+
+`--test-threads=1` is required, because the MusicBrainz rate limiter is per-`Resolver` and
+parallel tests trip it.
 
 ### Project structure
 
 ```
 trecker/
-├── backend/                     Spring Boot application
-│   ├── Dockerfile               Multi-stage production image
-│   ├── build.gradle.kts
-│   └── src/main/
-│       ├── java/cz/mtulek/trecker/
-│       │   ├── config/          CorsConfig, WebClientConfig
-│       │   ├── controller/      ReleaseController, GenreController, StatsController, AuthController, ProfileController
-│       │   ├── domain/          Release, Genre, ReleaseStatus, ReleaseType
-│       │   ├── dto/             Request/response records + stats DTOs
-│       │   ├── exception/       GlobalExceptionHandler, ResourceNotFoundException
-│       │   ├── repository/      ReleaseRepository (+ native queries), GenreRepository
-│       │   ├── service/         ReleaseService, GenreService, StatsService
-│       │   │   └── resolve/     MetadataResolverService, SpotifyService,
-│       │   │                    MusicBrainzService, TidalService, YouTubeService
-│       │   ├── specification/   ReleaseSpecification (JPA Criteria API)
-│       │   └── TreckerApplication.java
-│       └── resources/
-│           ├── application.yml
-│           ├── application-dev.yml
-│           ├── application-prod.yml
-│           └── db/changelog/    Liquibase master + 3 changesets
-├── frontend/                    Vue 3 application
-│   ├── Dockerfile               Multi-stage production image (nginx)
-│   ├── nginx.conf
-│   ├── vite.config.ts
+├── package.json              workspace root; owns the Tauri scripts
+├── frontend/                 Vue 3 application
 │   └── src/
-│       ├── api/                 axios.ts, releases.ts, genres.ts, stats.ts, auth.ts, profile.ts
+│       ├── api/              releases.ts, genres.ts, stats.ts, settings.ts
+│       │                     the only place that knows about Tauri
 │       ├── components/
-│       │   ├── layout/          AppLayout, AppSidebar
-│       │   ├── library/         LibraryFilters, ViewToggle
-│       │   ├── queue/           QueueActions
-│       │   ├── release/         QuickAddBar, ReleaseCard, ReleaseForm,
-│       │   │                    QuickLogModal, GenreTagInput
-│       │   └── stats/           ActivityChart, BreakdownChart,
-│       │                        TopRatedList, YearEndList
-│       ├── router/index.ts
-│       ├── stores/              releases.ts, genres.ts, stats.ts, auth.ts (Pinia)
-│       ├── types/index.ts
-│       └── views/               QueueView, LibraryView, StatsView, EntryView,
-│                                ProfileView
-├── docker-compose.yml           Dev stack (hot reload)
-├── docker-compose.prod.yml      Production stack (built images)
-├── .env.example                 Template for environment variables
-└── README.md
+│       │   ├── layout/       AppLayout, AppSidebar
+│       │   ├── library/      LibraryFilters, ViewToggle
+│       │   ├── queue/        QueueActions
+│       │   ├── release/      QuickAddBar, ReleaseCard, ReleaseForm,
+│       │   │                 QuickLogModal, GenreTagInput
+│       │   └── stats/        ActivityChart, BreakdownChart, TopRatedList, YearEndList
+│       ├── stores/           releases.ts, genres.ts, stats.ts (Pinia)
+│       ├── types/index.ts    single source of truth for TS interfaces
+│       └── views/            QueueView, LibraryView, StatsView, EntryView, SettingsView
+├── src-tauri/                Rust core
+│   ├── migrations/           sqlx migrations
+│   ├── tauri.conf.json
+│   └── src/
+│       ├── commands.rs       the #[tauri::command] surface
+│       ├── db.rs             pool, pragmas, migrations, diagnostics
+│       ├── domain.rs         wire types
+│       ├── error.rs          AppError → { code, message }
+│       ├── repo/             sqlx queries, filter builder, integration tests
+│       └── resolve/          MusicBrainz + Cover Art Archive
+├── backend/                  FROZEN Spring Boot app; see TAURI-MIGRATION.md
+└── TAURI-MIGRATION.md        the migration record and remaining plan
 ```
 
-### Environment variables
+### Configuration
 
-Copy `.env.example` to `.env` and fill in the values before starting any stack.
+There is none. No `.env`, no API keys, no connection strings. MusicBrainz and the Cover
+Art Archive are open, and everything else is local.
 
-```bash
-cp .env.example .env
-```
+### Command surface
 
-#### Required for all environments
+Fifteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
-| Variable | Description |
+| Command | Purpose |
 |---|---|
-| `POSTGRES_DB` | PostgreSQL database name |
-| `POSTGRES_USER` | PostgreSQL username |
-| `POSTGRES_PASSWORD` | PostgreSQL password — change from the default |
+| `releases_resolve` | Resolve a URL or search query to metadata |
+| `releases_create` | Add a release to the queue |
+| `releases_list` | List with filtering, sorting, pagination |
+| `releases_random` | Pick a random queued release |
+| `releases_get` | Fetch one release |
+| `releases_update` | Partial update; `status=LISTENED` stamps `dateListened` |
+| `releases_delete` | Stop tracking; the catalog row stays |
+| `releases_search_catalog` | Full-text autocomplete over the catalog |
+| `genres_list` | Every known genre |
+| `stats_activity` | Listening count by year and month |
+| `stats_by_genre` | Breakdown by genre |
+| `stats_by_country` | Breakdown by country |
+| `stats_top_rated` | Top-rated listened releases |
+| `stats_year_end` | Ranked list for a year |
+| `settings_db_info` | Database path, size, schema version, pragmas |
 
-#### Port configuration (dev only)
+`frontend/src/api/commands.test.ts` asserts every name and argument key, so a rename on
+either side of the boundary fails in CI rather than at runtime.
 
-| Variable | Default | Description |
-|---|---|---|
-| `BACKEND_PORT` | `8080` | Host port for the Spring Boot API |
-| `FRONTEND_PORT` | `5173` | Host port for the Vite dev server |
+### Data model
 
-#### API integration
+A shared catalog plus per-user tracking, kept from the web app because it is what would
+make sync tractable later:
 
-| Variable | Required | Description |
-|---|---|---|
-| `SPOTIFY_CLIENT_ID` | Recommended | Spotify Web API client ID. Without this, metadata resolution falls back to manual entry. Get credentials at [developer.spotify.com](https://developer.spotify.com/dashboard). |
-| `SPOTIFY_CLIENT_SECRET` | Recommended | Spotify Web API client secret. |
-| `YOUTUBE_API_KEY` | Optional | Google Data API v3 key for YouTube title parsing. Get a key at [console.cloud.google.com](https://console.cloud.google.com). Enable the **YouTube Data API v3**. |
-| `TIDAL_CLIENT_ID` | Optional | Tidal API client ID. Required for Tidal URL resolution. Register an app at [developer.tidal.com](https://developer.tidal.com). |
-| `TIDAL_CLIENT_SECRET` | Optional | Tidal API client secret. |
-| `TIDAL_COUNTRY_CODE` | Optional | ISO 3166-1 alpha-2 country code for Tidal catalog (default: `US`). |
+- `releases` — deduplicated catalog, keyed by `spotify_id` or `musicbrainz_id`.
+- `user_releases` — status, rating, notes, dates. Deleting one leaves the catalog row.
 
-#### Authentication
-
-| Variable | Default | Description |
-|---|---|---|
-| `JWT_SECRET` | required | Secret key for signing JWTs. Generate with: `openssl rand -base64 32`. Must be ≥ 32 bytes. |
-| `JWT_EXPIRATION_SECONDS` | `900` | Access token lifetime in seconds (default 15 minutes). |
-| `REFRESH_TOKEN_EXPIRATION_DAYS` | `30` | Refresh token lifetime in days. |
-| `COOKIE_SECURE` | `false` | Set to `true` in production (requires HTTPS). Marks cookies as `Secure`. |
-
-#### CORS / networking
-
-| Variable | Default | Description |
-|---|---|---|
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Comma-separated list of allowed frontend origins. Set to your production domain in prod. |
-| `VITE_API_BASE_URL` | `http://localhost:8080` | Base URL the frontend uses to reach the API. In the dev Docker stack the Vite proxy handles this internally. In production it is baked into the frontend image at build time. |
-
-> **MusicBrainz** requires no API key. The backend sends a `User-Agent` header as required by their policy. Requests are rate-limited to 1 req/s automatically.
-
-> **Tidal** uses OAuth2 Client Credentials. Without credentials, Tidal URLs open the manual entry form. Genres are not available from the Tidal API and are left empty (supplement via the form or MusicBrainz).
-
-### Running in development
-
-The dev stack mounts source directories and runs hot-reload servers — no images need to be built.
-
-```bash
-cp .env.example .env
-# fill in POSTGRES_PASSWORD, JWT_SECRET (openssl rand -base64 32), optionally SPOTIFY_CLIENT_ID/SECRET, TIDAL_CLIENT_ID/SECRET
-
-docker compose up
-```
-
-| Service | URL |
-|---|---|
-| Frontend (Vite) | http://localhost:5173 |
-| Backend API | http://localhost:8080/api |
-| Health check | http://localhost:8080/actuator/health |
-
-The backend starts `./gradlew bootRun` inside the container. First startup downloads Gradle dependencies (~2 min). Subsequent starts use the `gradle_cache` volume and are much faster.
-
-**Building locally** (without Docker):
-
-```bash
-# Backend — requires Java 25
-JAVA_HOME=/home/mtulek/.sdkman/candidates/java/25.0.2-amzn \
-  ./gradlew build -x test          # from backend/
-
-# Frontend
-npm install && npm run dev          # from frontend/
-```
-
-### Running in production
-
-The prod stack builds optimised images from the multi-stage Dockerfiles.
-
-```bash
-cp .env.example .env
-# set POSTGRES_PASSWORD, SPOTIFY_*, TIDAL_*, CORS_ALLOWED_ORIGINS, VITE_API_BASE_URL
-
-docker compose -f docker-compose.prod.yml up -d
-```
-
-The frontend nginx container exposes port 80 and proxies `/api/*` to the backend internally. The backend is not exposed on any host port.
+The `id` in an API response is the catalog release id; `createdAt` is from the tracking
+row, meaning when you added it.
 
 ### Database migrations
 
-Schema is managed by Liquibase. Migrations run automatically on startup.
+sqlx applies everything in `src-tauri/migrations/` at startup, in filename order. To add
+one, create `NNNN_description.sql`. There is no master file to register it in.
 
-```
-backend/src/main/resources/db/changelog/
-├── db.changelog-master.yaml
-└── changes/
-    ├── 001-create-releases-table.sql
-    ├── 002-create-genres-tables.sql
-    ├── 003-add-indexes.sql
-    ├── 004-create-users-table.sql
-    ├── 005-create-refresh-tokens-table.sql
-    ├── 006-add-user-id-to-releases.sql
-    └── 009-add-display-name-to-users.sql
-```
+### Known issues
 
-To add a new migration: create `NNN-description.sql` in `changes/` using the Liquibase formatted-SQL convention, then reference it in `db.changelog-master.yaml`.
-
-### API reference
-
-All endpoints are under `/api`. All endpoints except `/auth/**` require a valid `access_token` HttpOnly cookie.
-
-#### Authentication endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/auth/register` | Register a new account. Body: `{ email, password }`. Returns `201` + sets cookies. |
-| `POST` | `/auth/login` | Authenticate. Body: `{ email, password }`. Returns `200` + sets cookies. |
-| `POST` | `/auth/logout` | Revoke session. Returns `204` + clears cookies. |
-| `GET` | `/auth/me` | Returns current user `{ id, email, displayName }`. Returns `401` if unauthenticated. |
-| `POST` | `/auth/refresh` | Rotate refresh token (reads `refresh_token` cookie). Returns `200` + sets new cookies. |
-
-#### Profile endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/profile` | Returns current user's profile `{ id, email, displayName, createdAt }`. |
-| `PATCH` | `/profile` | Update display name. Body: `{ displayName }` (nullable — pass `null` to clear). Returns updated profile. |
-| `POST` | `/profile/password` | Change password. Body: `{ currentPassword, newPassword }`. Returns `204`. Returns `400` if `currentPassword` is wrong. |
-
-#### Release endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/releases/resolve` | Resolve a URL or search query to metadata |
-| `POST` | `/releases` | Add a release to the queue |
-| `GET` | `/releases` | List releases with filtering, sorting, pagination |
-| `GET` | `/releases/random` | Pick a random queued release |
-| `GET` | `/releases/{id}` | Get a single release |
-| `PATCH` | `/releases/{id}` | Partial update; setting `status=LISTENED` auto-sets `dateListened` |
-| `DELETE` | `/releases/{id}` | Delete a release |
-| `GET` | `/genres` | List all known genres |
-| `GET` | `/stats/activity` | Listening count by year/month |
-| `GET` | `/stats/by-genre` | Count breakdown by genre |
-| `GET` | `/stats/by-country` | Count breakdown by country |
-| `GET` | `/stats/by-type` | Count breakdown by release type |
-| `GET` | `/stats/top-rated` | Top-rated listened releases (`?limit=25`) |
-| `GET` | `/stats/year-end` | Ranked list for a given year (`?year=2024`) |
-
-#### `GET /releases` query parameters
-
-| Parameter | Type | Description |
-|---|---|---|
-| `status` | `QUEUED` \| `LISTENED` | Filter by status |
-| `genre` | string | Filter by genre name (exact, case-insensitive) |
-| `country` | string | Filter by country (case-insensitive) |
-| `releaseType` | string | Filter by type (e.g. `ALBUM`, `EP`) |
-| `year` | integer | Filter by release year |
-| `ratingMin` | 1–5 | Minimum rating |
-| `ratingMax` | 1–5 | Maximum rating |
-| `didNotFinish` | boolean | Filter by DNF flag |
-| `search` | string | Free-text search on artist and title |
-| `sort` | string | Field to sort by (default: `createdAt`) |
-| `direction` | `ASC` \| `DESC` | Sort direction (default: `DESC`) |
-| `page` | integer | Zero-based page number (default: `0`) |
-| `size` | integer | Page size (default: `20`) |
-
-### Known issues / gotchas
-
-- **Spring Boot 4.0.0 requires Gradle 9.0+.** Gradle 8.14's bundled Kotlin DSL cannot parse Java 25 version strings, causing a build failure. The committed wrapper uses Gradle 9.0.
-- **`primeicons` is a separate package.** It is not bundled with `primevue` and must be listed explicitly in `package.json`.
-- **`@primevue/themes` 4.5.x** is deprecated upstream (migrate to `@primeuix/themes` when ready). The Aura theme still works from the current package.
+- **FTS folds accents but not ligatures.** Searching `ros` finds *Sigur Rós*; `agaetis`
+  does not find *Ágætis byrjun*, though `agætis` does. Standard unicode61 behaviour.
+- **`primeicons` is a separate package** and must be listed explicitly.
+- **`@primevue/themes` 4.5.x** is deprecated upstream; the Aura theme still works.
+- **Builds are unsigned.** macOS Gatekeeper and Windows SmartScreen will warn until code
+  signing is set up.
 
 ---
 
 ## Roadmap
 
-- [x] Tidal API integration (`openapi.tidal.com/v2`)
-- [x] Authentication (Spring Security + JWT, HttpOnly cookies, refresh token rotation)
-- [x] Profile section (display name, change password)
-- [ ] Notion CSV import
+- [x] Local-first rewrite: Tauri 2 + SQLite, no server
+- [x] MusicBrainz and Cover Art Archive metadata
+- [x] Full-text catalog search
+- [ ] Signed and notarised builds, auto-update
 - [ ] Export to CSV / JSON
+- [ ] Optional account-based sync between devices
 - [ ] Keyboard shortcuts
+- [ ] Mobile
