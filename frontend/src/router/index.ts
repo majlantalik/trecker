@@ -1,24 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 
+// History mode is kept deliberately. Tauri's asset protocol falls back to index.html for
+// unmatched paths, verified against a production build in the Phase 0 spike, so the usual
+// advice to switch to hash history for Tauri does not apply here.
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
       redirect: '/queue'
-    },
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('@/views/LoginView.vue'),
-      meta: { public: true }
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/views/RegisterView.vue'),
-      meta: { public: true }
     },
     {
       path: '/queue',
@@ -42,34 +32,11 @@ const router = createRouter({
       props: true
     },
     {
-      path: '/profile',
-      name: 'profile',
-      component: () => import('@/views/ProfileView.vue')
-    },
-    {
-      // Phase 0 spike. Not public, so it renders inside AppLayout and exercises the
-      // sticky header, but exempt from the auth guard since the spike has no backend.
-      // Removed in Phase 1 along with the auth guard itself.
-      path: '/spike',
-      name: 'spike',
-      component: () => import('@/views/SpikeView.vue'),
-      meta: { spike: true }
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/SettingsView.vue')
     }
   ]
-})
-
-router.beforeEach(async (to) => {
-  if (to.meta.spike) return
-
-  const authStore = useAuthStore()
-
-  if (!to.meta.public && !authStore.isAuthenticated) {
-    return { path: '/login', query: { redirect: to.fullPath } }
-  }
-
-  if (to.meta.public && authStore.isAuthenticated) {
-    return { path: '/queue' }
-  }
 })
 
 export default router

@@ -19,7 +19,6 @@ import '@fontsource/outfit/600.css'
 
 import router from './router'
 import App from './App.vue'
-import { useAuthStore } from './stores/auth'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -37,9 +36,7 @@ app.use(PrimeVue, {
 app.use(ToastService)
 app.use(ConfirmationService)
 
-// Resolve auth state before installing router so the initial navigation guard sees correct isAuthenticated
-const authStore = useAuthStore()
-authStore.fetchMe().finally(() => {
-  app.use(router)
-  app.mount('#app')
-})
+// Nothing to resolve before mounting any more: there is no session to fetch and no
+// navigation guard to satisfy. The data lives on this machine.
+app.use(router)
+app.mount('#app')

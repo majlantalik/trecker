@@ -31,44 +31,29 @@
     </ul>
 
     <div class="sidebar-user">
-      <RouterLink to="/profile" class="user-info" active-class="user-info--active">
-        <div class="user-avatar">{{ userInitial }}</div>
+      <RouterLink to="/settings" class="user-info" active-class="user-info--active">
+        <div class="user-avatar"><i class="pi pi-cog" /></div>
         <div class="user-text">
-          <span class="user-name">{{ authStore.user?.displayName || authStore.user?.email }}</span>
-          <span v-if="authStore.user?.displayName" class="user-email">{{ authStore.user?.email }}</span>
+          <span class="user-name">Settings</span>
+          <span class="user-email">Local library</span>
         </div>
       </RouterLink>
-      <button class="logout-btn" @click="handleLogout" title="Sign out">
-        <i class="pi pi-sign-out" />
-      </button>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useReleasesStore } from '@/stores/releases'
-import { useAuthStore } from '@/stores/auth'
 
 const releasesStore = useReleasesStore()
-const authStore = useAuthStore()
-const router = useRouter()
 
 const queueCount = computed(() => releasesStore.total)
-const userInitial = computed(() => {
-  const u = authStore.user
-  return (u?.displayName?.[0] ?? u?.email?.[0])?.toUpperCase() ?? '?'
-})
 
 onMounted(() => {
   releasesStore.fetchReleases({ status: 'QUEUED', size: 1 })
 })
-
-async function handleLogout() {
-  await authStore.logout()
-  router.push('/login')
-}
 </script>
 
 <style scoped>
@@ -254,7 +239,7 @@ async function handleLogout() {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--tk-accent);
   flex-shrink: 0;
@@ -278,32 +263,9 @@ async function handleLogout() {
 
 .user-email {
   font-size: 0.72rem;
-  color: var(--tk-text-muted);
+  color: rgba(226, 228, 240, 0.45);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.logout-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.4rem;
-  border-radius: 6px;
-  color: var(--tk-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-}
-
-.logout-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--tk-text);
-}
-
-.logout-btn i {
-  font-size: 0.875rem;
 }
 </style>

@@ -150,10 +150,8 @@ read the accessibility tree instead, which is why the spike renders its checks a
 elements. `GDK_BACKEND=x11` forces XWayland if an X11 tool is needed. Note that
 `document.title` does not propagate to the native window title on WebKitGTK.
 
-### Re-running the spike
-
-Set `app.windows[0].url` to `/spike` in `src-tauri/tauri.conf.json`, then `npm run dev`.
-Remove the key again afterwards.
+The spike view and its route were removed in Phase 1. To re-run those checks, recover
+`frontend/src/views/SpikeView.vue` from commit `8055443`.
 
 ### Found while scaffolding
 
@@ -213,23 +211,58 @@ Command names map 1:1 onto the existing API functions:
 | `statsApi.getYearEnd` | `stats_year_end` |
 
 Tasks:
-- [ ] Add `@tauri-apps/api`; delete `axios` and `axios-mock-adapter`
-- [ ] Rewrite `releases.ts`, `genres.ts`, `stats.ts` bodies
-- [ ] Delete `api/axios.ts`, `api/axios.test.ts`, `api/auth.ts`, `api/profile.ts`
-- [ ] Delete `stores/auth.ts`, `stores/auth.test.ts`
-- [ ] Delete `views/LoginView.vue`, `views/RegisterView.vue`
-- [ ] Gut `views/ProfileView.vue` into a local Settings view: keep the route and the panel
-      styling, drop display name, email and password change, leave a placeholder section
-      for the Phase 4 provider toggles
-- [ ] Strip auth guards and the login/register routes from `router/index.ts`, and remove
-      the `/spike` route and its guard exemption
-- [ ] Remove the `fetchMe()` call from `main.ts`
-- [ ] Keep `stores/releases.test.ts` and the component tests; retarget mocks from axios to `invoke`
+- [x] Add `@tauri-apps/api`; delete `axios` and `axios-mock-adapter`
+- [x] Rewrite `releases.ts`, `genres.ts`, `stats.ts` bodies
+- [x] Delete `api/axios.ts`, `api/axios.test.ts`, `api/auth.ts`, `api/profile.ts`
+- [x] Delete `stores/auth.ts`, `stores/auth.test.ts`
+- [x] Delete `views/LoginView.vue`, `views/RegisterView.vue`
+- [x] Replace `views/ProfileView.vue` with `views/SettingsView.vue`, reusing the section
+      styling, at `/settings`
+- [x] Strip auth guards and the login/register routes from `router/index.ts`, and remove
+      the `/spike` route and `SpikeView.vue`
+- [x] Remove the `fetchMe()` call from `main.ts`
+- [x] Keep `stores/releases.test.ts` and the component tests; add `api/commands.test.ts`
 
-Note `stores/releases.ts` (115 lines) and the views should need no changes beyond the
-mock retarget. If they do, the seam was leakier than expected — fix that, do not spread it.
+**Exit criterion: MET.** The app runs with no network layer. Verified against a production
+build by driving the real window: the queue lists fixtures, Stats renders all three charts
+with correct aggregation and ordering, Settings renders, and deleting a release removes it
+and drops both the heading and the sidebar badge from 4 to 3.
 
-**Exit criterion:** app runs on stub commands returning fixtures, with no network layer.
+30 frontend tests pass, typecheck is clean, and the Rust side compiles without warnings.
+
+### What the seam swap actually cost
+
+The prediction held. `stores/releases.ts`, `stores/genres.ts` and `stores/stats.ts` needed
+**zero changes** — they only ever touched the API layer. None of the seven views changed
+either, beyond the two that were deleted and the one that was replaced.
+
+What did change, beyond the API bodies:
+
+- `App.vue` lost its `route.meta.public` branch, so there is one layout, not two.
+- `AppSidebar.vue` lost the avatar, the user name and the sign-out button. The footer slot
+  now links to Settings, reusing the same styling.
+- `main.ts` mounts synchronously. There is no session to resolve first.
+
+### Deviations from the plan as written
+
+**The store is not a stub.** The plan said fixtures; `store.rs` is a real in-memory store
+with working create, update, delete, filter, sort and pagination, seeded with ten releases.
+Stubs would not have caught anything. This did: it proved the filter contract and the
+full write round trip. Phase 3 replaces this module with sqlx and the command signatures
+do not move.
+
+**`ProfileView.vue` was replaced rather than gutted.** Reusing its section CSS was worth
+it, but nothing else in the file survived the removal of accounts, so editing it in place
+would have been a rewrite pretending to be an edit. The route moved `/profile` →
+`/settings` to match.
+
+**The sort whitelist landed early.** `SORTABLE` in `store.rs` already rejects unknown sort
+fields. That is the Phase 3 injection fix, put in now so the contract is correct before
+the SQL exists rather than after.
+
+**`api/commands.test.ts` replaces `api/axios.test.ts`.** The deleted test covered the 401
+refresh interceptor, which no longer exists. The new one asserts every command name and
+argument key, so a rename on either side of the boundary fails in CI instead of at runtime.
 
 ---
 
