@@ -105,34 +105,13 @@ export interface YearEndEntry {
   release: Release
 }
 
-export interface UserDto {
-  id: string
-  email: string
-  displayName: string | null
-}
-
-export interface LoginRequest {
-  email: string
-  password: string
-}
-
-export interface RegisterRequest {
-  email: string
-  password: string
-}
-
-export interface ProfileDto {
-  id: string
-  email: string
-  displayName: string | null
-  createdAt: string
-}
-
-export interface UpdateProfileRequest {
-  displayName: string | null
-}
-
-export interface ChangePasswordRequest {
-  currentPassword: string
-  newPassword: string
+export interface DbInfo {
+  path: string
+  sizeBytes: number
+  schemaVersion: number
+  fts5: boolean
+  journalMode: string
+  foreignKeys: boolean
+  releaseCount: number
+  trackedCount: number
 }

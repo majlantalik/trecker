@@ -5,11 +5,22 @@
 //! replaces the bodies with SQLite and Phase 4 replaces `releases_resolve` with real
 //! providers, but the names, arguments and return shapes stay exactly as they are here.
 
+use crate::db::{Db, DbInfo};
 use crate::domain::*;
 use crate::error::{AppError, AppResult};
 use crate::store::Store;
 use std::collections::HashMap;
 use tauri::State;
+
+// ---------------------------------------------------------------- settings
+
+/// Diagnostics, not part of the release API. Surfaces where the database actually is and
+/// what state it is in, which is the only way to tell from inside the app that the file
+/// was created, migrated and opened with the pragmas we asked for.
+#[tauri::command]
+pub async fn settings_db_info(db: State<'_, Db>) -> AppResult<DbInfo> {
+    db.info().await
+}
 
 // ---------------------------------------------------------------- releases
 

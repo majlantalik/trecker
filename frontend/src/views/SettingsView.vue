@@ -10,26 +10,76 @@
 
     <div class="settings-section">
       <div class="section-header">
-        <i class="pi pi-database section-icon" />
+        <i class="pi pi-list section-icon" />
         <h2 class="section-title">Library</h2>
       </div>
       <div class="section-body">
-        <div class="stat-row">
+        <p class="stat-row">
           <span class="stat-label">Releases</span>
           <span class="stat-value">{{ counts.total }}</span>
-        </div>
-        <div class="stat-row">
+        </p>
+        <p class="stat-row">
           <span class="stat-label">In queue</span>
           <span class="stat-value">{{ counts.queued }}</span>
-        </div>
-        <div class="stat-row">
+        </p>
+        <p class="stat-row">
           <span class="stat-label">Listened</span>
           <span class="stat-value">{{ counts.listened }}</span>
-        </div>
-        <p class="form-hint">
-          Storage is in-memory until the local database lands, so changes are lost when the
-          app closes.
         </p>
+        <p class="form-hint">
+          Reads still come from memory. The next step moves them onto the database below.
+        </p>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="section-header">
+        <i class="pi pi-database section-icon" />
+        <h2 class="section-title">Database</h2>
+      </div>
+      <div class="section-body">
+        <p v-if="dbError" class="db-error">{{ dbError }}</p>
+        <template v-else-if="db">
+          <p class="stat-row">
+            <span class="stat-label">Location</span>
+            <span class="stat-value stat-path" :title="db.path">{{ db.path }}</span>
+          </p>
+          <p class="stat-row">
+            <span class="stat-label">Size on disk</span>
+            <span class="stat-value">{{ formatBytes(db.sizeBytes) }}</span>
+          </p>
+          <p class="stat-row">
+            <span class="stat-label">Schema version</span>
+            <span class="stat-value">{{ db.schemaVersion }}</span>
+          </p>
+          <p class="stat-row">
+            <span class="stat-label">Catalog rows</span>
+            <span class="stat-value">{{ db.releaseCount }}</span>
+          </p>
+          <p class="stat-row">
+            <span class="stat-label">Tracking rows</span>
+            <span class="stat-value">{{ db.trackedCount }}</span>
+          </p>
+          <p class="stat-row">
+            <span class="stat-label">Journal mode</span>
+            <Tag :value="db.journalMode.toUpperCase()" severity="success" />
+          </p>
+          <p class="stat-row">
+            <span class="stat-label">Foreign keys</span>
+            <Tag
+              :value="db.foreignKeys ? 'On' : 'Off'"
+              :severity="db.foreignKeys ? 'success' : 'danger'"
+            />
+          </p>
+          <p class="stat-row">
+            <span class="stat-label">Full-text search</span>
+            <Tag
+              :value="db.fts5 ? 'FTS5' : 'Unavailable'"
+              :severity="db.fts5 ? 'success' : 'danger'"
+            />
+          </p>
+        </template>
+        <p v-else class="form-hint">Reading database state…</p>
       </div>
     </div>
 
@@ -59,10 +109,10 @@
         <h2 class="section-title">About</h2>
       </div>
       <div class="section-body">
-        <div class="stat-row">
+        <p class="stat-row">
           <span class="stat-label">Version</span>
           <span class="stat-value">{{ version }}</span>
-        </div>
+        </p>
       </div>
     </div>
   </div>
@@ -72,10 +122,20 @@
 import { ref, onMounted } from 'vue'
 import Tag from 'primevue/tag'
 import { releasesApi } from '@/api/releases'
+import { settingsApi } from '@/api/settings'
+import type { DbInfo } from '@/types'
 
 const version = '0.1.0'
 
 const counts = ref({ total: 0, queued: 0, listened: 0 })
+const db = ref<DbInfo | null>(null)
+const dbError = ref('')
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
 
 // Providers are declared here rather than fetched: nothing is configurable until the
 // OAuth work lands, and a toggle that does nothing is worse than an honest label.
@@ -97,6 +157,12 @@ onMounted(async () => {
     total: all.totalElements,
     queued: queued.totalElements,
     listened: listened.totalElements
+  }
+
+  try {
+    db.value = await settingsApi.dbInfo()
+  } catch (e: any) {
+    dbError.value = e?.message ?? String(e)
   }
 })
 </script>
@@ -192,6 +258,7 @@ onMounted(async () => {
 }
 
 .stat-row {
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -220,5 +287,22 @@ onMounted(async () => {
   font-size: 0.75rem;
   color: rgba(226, 228, 240, 0.45);
   margin: 0.25rem 0 0;
+}
+
+.stat-path {
+  font-size: 0.78rem;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: right;
+  min-width: 0;
+}
+
+.db-error {
+  color: #f43f5e;
+  font-size: 0.85rem;
+  margin: 0;
 }
 </style>

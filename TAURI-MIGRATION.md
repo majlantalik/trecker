@@ -293,16 +293,65 @@ table, so it needs no restructuring.
 launch. This costs nothing now and is what makes Phase 6 possible.
 
 New:
-- [ ] FTS5 virtual table over `releases(artist, title)` with insert/update/delete triggers
-- [ ] Connection PRAGMAs on every connection: `journal_mode=WAL`, `foreign_keys=ON`,
+- [x] FTS5 virtual table over `releases(artist, title)` with insert/update/delete triggers
+- [x] Connection PRAGMAs on every connection: `journal_mode=WAL`, `foreign_keys=ON`,
       `busy_timeout=5000`, `synchronous=NORMAL`
-- [ ] DB file at Tauri's `app_data_dir()`, created on first run, migrations applied at startup
+- [x] DB file at Tauri's `app_data_dir()`, created on first run, migrations applied at startup
 
 Data migration from the existing Postgres instance:
-- [ ] `scripts/export-to-sqlite.ts` that calls the running backend's
-      `GET /api/releases?size=10000` with a valid session and emits SQLite INSERTs.
-      Going through the API reuses the `ReleaseResponse` shape and avoids schema drift.
-      One-time, throwaway, does not need to be pretty.
+- [x] `scripts/import-from-postgres.py`
+
+**Exit criterion: MET.** The database is created, migrated and opened on first launch.
+
+### Verified
+
+Read back from inside the running app, on the pool's own connection, which is what
+matters because SQLite pragmas are per-connection and a separate reader would have told
+us nothing:
+
+| | |
+|---|---|
+| Location | `~/.local/share/cz.mtulek.trecker/trecker.db` |
+| Schema version | 1 |
+| Journal mode | WAL |
+| Foreign keys | On |
+| Full-text search | FTS5 present |
+
+Exercised directly against the file: all three FTS triggers (insert indexes, update
+re-indexes, delete removes), prefix matching, `ON DELETE CASCADE` from a catalog row to
+its tracking row, and the status CHECK rejecting a value outside the enum.
+
+### Known limitation: ligatures do not fold
+
+`remove_diacritics 2` folds accents, so searching `ros` finds *Sigur Rós*. It does not
+decompose ligatures, so `agaetis` does not find *Ágætis byrjun*, while `agætis` does.
+That is unicode61 behaving as documented, not a misconfiguration. It affects Nordic and
+German titles (æ, ø, ß). Fixing it means either a custom tokenizer registered from Rust
+or an ASCII-folded shadow column maintained at write time. Deferred, not forgotten.
+
+### Deviations from the plan as written
+
+**The import script reads Postgres directly, not the REST API.** The plan wanted to go
+through `GET /api/releases` to avoid schema drift. There is no drift to avoid: the SQLite
+schema was written from the Postgres one and they are near-identical. Reading the database
+directly means the import needs no running backend, no login and no network, which makes
+it far likelier to still work months from now.
+
+**It handles the multi-account case.** If the old database holds more than one user it
+refuses to guess and asks for `--user`. Silently merging two people's tracking rows into
+one local library would be a quiet data corruption, not an inconvenience.
+
+**`updated_at` is on `user_releases` from the start**, per the Phase 6 note. Adding a
+`NOT NULL` column later to a populated table is meaningfully worse than carrying it now.
+
+**A `settings_db_info` command was added**, outside the fourteen. It is diagnostics, not
+part of the release API, and it is how the table above was read. It also makes the
+Settings view honest about where the data actually lives.
+
+**The import script has not been run against real data.** There is no populated Postgres
+available here. Its conversion logic is unit-tested (timezone-offset timestamps to UTC
+RFC3339, Postgres `t`/`f` to 0/1, empty CSV fields to NULL) but the end-to-end path is
+unproven. Run it with `--dry-run` first.
 
 ---
 
