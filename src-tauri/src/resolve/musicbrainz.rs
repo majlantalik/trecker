@@ -17,6 +17,11 @@ const API: &str = "https://musicbrainz.org/ws/2";
 pub struct ReleaseDetails {
     pub genres: Vec<String>,
     pub first_release_year: Option<i32>,
+    /// The album, as opposed to the particular pressing that the search matched.
+    pub release_group_id: Option<String>,
+    /// Where the artist is from, which is a different question from where this pressing
+    /// was sold.
+    pub artist_country: Option<String>,
 }
 
 /// MusicBrainz country codes that are not countries.
@@ -150,17 +155,18 @@ impl Resolver {
         })
     }
 
-    /// Best-effort second lookup, for the two things the search result cannot give us.
+    /// One rate-limited request that fixes everything a search result gets wrong.
     ///
-    /// Genres, because the web app got those from Spotify and they would otherwise be
-    /// lost along with the By Genre chart. And the original release year, because a
-    /// search returns one *pressing*: asking for "Slint - Spiderland" can land on a 2014
-    /// reissue and report 2014, which is not what anyone means by an album's year. The
-    /// release group carries `first-release-date`, which is the date of the album itself.
+    /// A MusicBrainz search matches a single *pressing*, and whichever one it picks is
+    /// close to arbitrary. That pressing's year is the year of that edition, its country
+    /// is wherever that edition was sold, and it often has no cover art of its own. The
+    /// album is the release *group*, so that is where the real answers are.
     ///
-    /// Costs one rate-limited request, so it is separate and allowed to fail.
+    /// Asking for `artists` in the same breath costs nothing extra and supplies the
+    /// artist's own country. Best-effort throughout: a release with no tags, no group and
+    /// no known artist country is still a usable result.
     pub async fn mb_release_details(&self, mbid: &str) -> ReleaseDetails {
-        let url = format!("{API}/release/{mbid}?inc=genres+release-groups&fmt=json");
+        let url = format!("{API}/release/{mbid}?inc=genres+release-groups+artists&fmt=json");
         let Some(body) = self.mb_get(&url).await else {
             return ReleaseDetails::default();
         };
@@ -180,35 +186,38 @@ impl Resolver {
             .and_then(|d| d.get(0..4))
             .and_then(|y| y.parse().ok());
 
-        ReleaseDetails {
-            genres,
-            first_release_year,
-        }
-    }
-
-    /// Country of an artist, falling back to the broader area when the country is unset.
-    pub async fn mb_artist_country(&self, artist: &str) -> Option<String> {
-        let url = format!(
-            "{API}/artist?query={}&fmt=json&limit=1",
-            urlencode(&escape_lucene(artist))
-        );
-        let body = self.mb_get(&url).await?;
-        let first = body.get("artists")?.as_array()?.first()?;
-
-        first
-            .get("country")
+        let release_group_id = group
+            .and_then(|rg| rg.get("id"))
             .and_then(Value::as_str)
-            .filter(|c| !c.is_empty())
+            .map(String::from);
+
+        let artist = body
+            .get("artist-credit")
+            .and_then(Value::as_array)
+            .and_then(|c| c.first())
+            .and_then(|c| c.get("artist"));
+        let artist_country = artist
+            .and_then(|a| a.get("country"))
+            .and_then(Value::as_str)
+            .filter(|c| is_real_country(c))
             .map(String::from)
             .or_else(|| {
-                first
+                artist?
                     .get("area")?
                     .get("name")?
                     .as_str()
                     .filter(|n| !n.is_empty())
                     .map(String::from)
-            })
+            });
+
+        ReleaseDetails {
+            genres,
+            first_release_year,
+            release_group_id,
+            artist_country,
+        }
     }
+
 }
 
 /// Whether an HTTP status is worth trying again.

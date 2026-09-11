@@ -92,27 +92,29 @@ impl Resolver {
         let mut result = self.mb_search_release(query).await?;
 
         if let Some(mbid) = result.musicbrainz_id.clone() {
-            // Sequential rather than concurrent on purpose: both would queue behind the
-            // same one-per-second gate anyway, and the Cover Art Archive is only reachable
-            // once the release id is known.
-            result.album_art_url = self.cover_art(&mbid).await;
-
+            // Details first, because everything else depends on what it returns. The
+            // search matched one pressing; this is what turns that into the album.
             let details = self.mb_release_details(&mbid).await;
+
             result.genres = details.genres;
-            // The release group's first release date beats the matched pressing's own
-            // date: a search for Spiderland can land on the 2014 reissue, and 1991 is the
-            // answer anyone actually wants.
+
+            // The album's first release date beats the matched pressing's own date. A
+            // search for Spiderland can land on the 2014 reissue, and 1991 is the answer
+            // anyone actually wants.
             if let Some(year) = details.first_release_year {
                 result.release_year = Some(year);
             }
-        }
 
-        // The web app filled country from the release; fall back to the artist's country
-        // when the release does not carry one, which is common for digital releases.
-        if result.country.is_none() {
-            if let Some(artist) = result.artist.clone() {
-                result.country = self.mb_artist_country(&artist).await;
+            // The artist's country beats the pressing's. Where a particular edition was
+            // sold is close to arbitrary, and "Avenged Sevenfold are Canadian" is simply
+            // wrong. Falls back to the release country when the artist has none.
+            if details.artist_country.is_some() {
+                result.country = details.artist_country;
             }
+
+            result.album_art_url = self
+                .cover_art(&mbid, details.release_group_id.as_deref())
+                .await;
         }
 
         Some(result)
@@ -280,8 +282,8 @@ mod tests {
     async fn rate_limit_gate_spaces_requests_out() {
         let r = Resolver::new("0.1.0-test");
         let start = std::time::Instant::now();
-        let _ = r.mb_artist_country("Slint").await;
-        let _ = r.mb_artist_country("Duster").await;
+        let _ = r.mb_search_release("Slint - Spiderland").await;
+        let _ = r.mb_search_release("Duster - Stratosphere").await;
         let elapsed = start.elapsed();
         assert!(
             elapsed >= Duration::from_millis(1100),
@@ -307,5 +309,31 @@ mod tests {
             "link saved, tracking parameter stripped"
         );
         assert!(found.artist.is_none(), "no credentials, so no metadata");
+    }
+
+    /// The release that failed in real use: the search matches a Canadian pressing with
+    /// no cover art of its own, credited to a band from California.
+    #[tokio::test]
+    #[ignore = "makes real network requests"]
+    async fn falls_back_to_the_album_when_the_pressing_has_no_art() {
+        let r = Resolver::new("0.1.0-test");
+        let found = r
+            .resolve(ResolveRequest {
+                query: Some("avenged sevenfold - city of evil".into()),
+                url: None,
+            })
+            .await
+            .expect("should resolve");
+
+        println!("{found:#?}");
+        assert_eq!(found.title.as_deref(), Some("City of Evil"));
+        assert_eq!(found.release_year, Some(2005));
+        assert_eq!(found.country.as_deref(), Some("US"), "the band, not the pressing");
+        assert!(
+            found.album_art_url.is_some(),
+            "the pressing has no art but the release group does"
+        );
+        let art = found.album_art_url.unwrap();
+        assert!(art.starts_with("https://"), "must be https or the CSP blocks it: {art}");
     }
 }

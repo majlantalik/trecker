@@ -582,10 +582,37 @@ URLs in its JSON**, so with this policy every album cover would have been blocke
 without it every cover would have been fetched in plaintext. The same paths serve fine
 over TLS, so the resolver now upgrades the scheme before the URL is stored.
 
-### Not verified
+### The cover still did not appear, for a different reason
 
-The artwork URL is now `https` and the policy permits it, but nobody has seen a cover
-actually paint. Screenshots are unavailable here. Worth one look.
+Reported from real use, and the stored URL turned out to be `NULL` rather than blocked.
+A MusicBrainz search matches a single *pressing*, and "Avenged Sevenfold - City of Evil"
+matched a Canadian edition with no art in the archive, even though the album obviously has
+a cover. The release *group* is the album, and the archive tracks a front cover for it, so
+a miss on the pressing now falls back to the group.
+
+The same root cause explains a second oddity in that record: it was filed under country
+`CA`, because that is where that edition was sold. The band are from California. The
+artist's country now wins, falling back to the release's only when the artist has none.
+
+Both fixes ride along on a request that was already being made. Adding `artists` to the
+release lookup returns the artist's country, and the release group id was already in that
+response. No extra rate-limited call.
+
+`mb_artist_country` was deleted: the separate artist lookup it existed for is now
+redundant.
+
+Verified live on both the release that failed and the original test case:
+
+| | before | after |
+|---|---|---|
+| City of Evil, artwork | none | release-group cover, https |
+| City of Evil, country | CA | US |
+| Spiderland, year | 2014 | 1991 |
+
+### Still worth a look
+
+Nobody has watched a cover actually paint. The URL is `https` and the policy permits it,
+but screenshots are unavailable here.
 
 ---
 

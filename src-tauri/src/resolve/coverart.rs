@@ -9,8 +9,21 @@ use serde_json::Value;
 use std::time::Duration;
 
 impl Resolver {
-    pub async fn cover_art(&self, mbid: &str) -> Option<String> {
-        let url = format!("https://coverartarchive.org/release/{mbid}");
+    /// Artwork for a specific pressing, falling back to the album.
+    ///
+    /// The pressing a MusicBrainz search happens to match often has no art uploaded even
+    /// when the album plainly does: "Avenged Sevenfold - City of Evil" matches a Canadian
+    /// edition with nothing in the archive, while the release group has the cover
+    /// everyone would recognise. So a miss on the release is not a miss.
+    pub async fn cover_art(&self, mbid: &str, release_group_id: Option<&str>) -> Option<String> {
+        if let Some(url) = self.cover_art_for("release", mbid).await {
+            return Some(url);
+        }
+        self.cover_art_for("release-group", release_group_id?).await
+    }
+
+    async fn cover_art_for(&self, kind: &str, id: &str) -> Option<String> {
+        let url = format!("https://coverartarchive.org/{kind}/{id}");
 
         let mut attempt = 0;
         let body: Value = loop {
