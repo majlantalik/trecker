@@ -352,11 +352,9 @@ does not look like an oversight.
 
 Order matters: repos before commands, commands before deleting the stubs.
 
-- [ ] `domain/` structs with `serde::Serialize`. Field names must serialize to exactly what
-      `frontend/src/types/index.ts` expects. Use `#[serde(rename_all = "camelCase")]`.
-- [ ] `repo/` sqlx queries. Use the `query!` macros so the schema is checked at compile time.
-- [ ] `query/filter.rs`: port `UserReleaseSpecification` (74 lines) to a `QueryBuilder<Sqlite>`.
-      This is the fiddliest translation in the project.
+- [x] `domain.rs` structs with `serde::Serialize`, `#[serde(rename_all = "camelCase")]`
+- [x] `repo/` sqlx queries
+- [x] `repo/filter.rs`: port `UserReleaseSpecification` (74 lines) to a `QueryBuilder<Sqlite>`
 
 Two things to get right in the filter port:
 
@@ -368,13 +366,73 @@ country and genre comparisons.
 string. JPA made that safe. Raw SQL does not. Whitelist the sortable columns to an enum
 and reject anything else.
 
-- [ ] Preserve the `PageResponse<T>` shape, which means a `COUNT(*)` query alongside the page
-- [ ] Port `ReleaseService.create()` dedup. This gets *simpler*: single-process SQLite means
-      `INSERT ... ON CONFLICT DO NOTHING RETURNING id` replaces catching
-      `DataIntegrityViolationException` and retrying the lookup.
-- [ ] Port `StatsService` (87 lines) to five SQL aggregate queries
-- [ ] `error.rs`: one `AppError` enum, serialized to the frontend as `{ code, message }`
-- [ ] Replace the Phase 1 stubs command by command, verifying each view as you go
+- [x] Preserve the `PageResponse<T>` shape, which means a `COUNT(*)` query alongside the page
+- [x] Port `ReleaseService.create()` dedup
+- [x] Port `StatsService` (87 lines) to five SQL aggregate queries
+- [x] `error.rs`: one `AppError` enum, serialized to the frontend as `{ code, message }`
+- [x] Replace the Phase 1 store; `store.rs` is deleted
+
+**Exit criterion: MET.** Every command reads and writes SQLite. The in-memory store is gone.
+
+### Verified
+
+**28 Rust tests**, run against a real SQLite file through the real migration, covering
+dedup on both external ids, idempotent re-tracking, genre find-or-create and
+case-insensitive dedup, cascade behaviour on delete, every filter predicate, the sort
+whitelist, pagination arithmetic across three pages, FTS behaviour including operator
+injection, the year-end boundary, and reopening the database.
+
+**Through the running app**, on a production build: the empty states render on a fresh
+database; all five stats commands return and draw; after inserting three releases the
+queue reads them back with their streaming links attached; Top Rated orders 5.0 above
+4.5; and deleting through the UI takes tracking rows from 3 to 2 while catalog rows stay
+at 3, leaving exactly the deleted release orphaned in the catalog.
+
+30 frontend tests pass and the typecheck is clean.
+
+### Deviations from the plan as written
+
+**`sqlx::query!` macros were not used.** They need a live database at compile time
+(`DATABASE_URL` or a checked-in `.sqlx` cache) and they cannot check a query that is
+assembled at runtime, which every filtered query here is. Runtime-checked `query()` with
+`try_get` is used throughout instead. The integration tests cover what the macro would
+have: a wrong column name fails a test rather than a build.
+
+**The genre filter uses `EXISTS`, not a join.** The Java joined to `genres` and then
+needed `query.distinct(true)` to undo the row multiplication it had just caused. `EXISTS`
+asks the same question without ever producing duplicates, so the long-standing gotcha
+about remembering `distinct` does not carry over. There is a test asserting a release
+with three genres appears once.
+
+**Text sorting is now case-insensitive.** `COLLATE NOCASE` on artist and title. SQLite's
+default collation orders every capital before every lowercase letter, so a library sorted
+by artist would have put "zZ Top" before "beach House". This is a deliberate change from
+the Postgres behaviour, not an accident of the port.
+
+**Sorting gained a tiebreaker.** `ORDER BY <column>, ur.id`. Without it, rows equal on the
+sort column can change places between page fetches, so one release shows up on two pages
+and another never appears. The Java had the same latent bug.
+
+**FTS5 is used for catalog search only.** The library filter box keeps substring `LIKE`,
+matching the Java exactly, because FTS matches whole tokens and prefixes: it would stop
+finding "phere" inside "Stratosphere". Prefix semantics are right for autocomplete and
+wrong for a filter that narrows as you type. Both behaviours are tested.
+
+**User input is never passed to FTS5 raw.** FTS5 has its own query language, so `"`, `*`,
+`:`, `-`, `AND`, `OR` and `NOT` are either syntax errors or silently mean something else.
+Every token is quoted and given a trailing `*`. Tested with deliberately hostile input.
+
+**`chrono` and `uuid` were not added.** The schema stores timestamps as RFC3339 text and
+ids as text; generating both is a few lines each, already written and tested for the
+Phase 1 store. Two fewer dependencies in a binary that has to be signed and shipped.
+
+### Not verified
+
+**Quick Add could not be driven from the UI.** Keyboard input needs the window focused,
+which the OS-level tooling could not achieve under Wayland, and the autocomplete widget
+rejects direct value writes. So the create path is proven by integration tests and by
+inserting rows directly, but not by typing into the app. Worth a manual check: type an
+artist and title, click Add, and confirm the release lands in the queue.
 
 ---
 
@@ -445,9 +503,10 @@ Conflict model, which the existing data model already gives us for free:
   held throwaway test rows, on one machine, and was never deployed. Nothing is worth
   carrying across.
 
+- **The app starts genuinely empty. No seed data.** All four stats components, the queue
+  and the library already had empty states, so a fresh database reads as deliberate rather
+  than broken. Seed rows in a personal library are clutter you have to delete.
+
 ## Open decisions
 
 1. Ship Spotify at all in v1, given it is on a deprecation path?
-2. When Phase 3 moves reads onto SQLite, the ten seeded fixtures in `store.rs` go with it
-   and the app opens empty. Seed the database on first run with a few releases so the
-   views have something to show, or start genuinely empty?

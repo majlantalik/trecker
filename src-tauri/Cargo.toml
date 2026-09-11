@@ -27,6 +27,10 @@ sqlx = { version = "0.8", default-features = false, features = [
     "macros",
 ] }
 
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tempfile = "3"
+
 [profile.release]
 codegen-units = 1
 lto = true

@@ -2,15 +2,13 @@ mod commands;
 mod db;
 mod domain;
 mod error;
-mod store;
+mod repo;
 
-use store::Store;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(Store::new())
         .setup(|app| {
             // The database lives beside the app's other per-user state, which is
             // %APPDATA% on Windows, ~/Library/Application Support on macOS and
