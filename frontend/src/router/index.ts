@@ -45,11 +45,22 @@ const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: () => import('@/views/ProfileView.vue')
+    },
+    {
+      // Phase 0 spike. Not public, so it renders inside AppLayout and exercises the
+      // sticky header, but exempt from the auth guard since the spike has no backend.
+      // Removed in Phase 1 along with the auth guard itself.
+      path: '/spike',
+      name: 'spike',
+      component: () => import('@/views/SpikeView.vue'),
+      meta: { spike: true }
     }
   ]
 })
 
 router.beforeEach(async (to) => {
+  if (to.meta.spike) return
+
   const authStore = useAuthStore()
 
   if (!to.meta.public && !authStore.isAuthenticated) {

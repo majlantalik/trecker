@@ -70,6 +70,22 @@ typed queries in Rust and a narrow command surface.
 
 ---
 
+## Build prerequisites (Linux dev machine)
+
+Rust 1.95 and Node 20 are already present. The webview headers are not:
+
+```
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
+  libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev \
+  build-essential curl wget file libssl-dev pkg-config
+```
+
+Then, from the repo root:
+
+```
+npm --prefix frontend run tauri:dev
+```
+
 ## Phase 0 — Spike (target: one weekend)
 
 Goal: kill the biggest unknown before committing. The unknown is WebKitGTK on Linux,
@@ -91,6 +107,22 @@ The only risky properties are `backdrop-filter` in `AppLayout.vue:41` (already
 
 **Exit criterion:** the Linux build is visually acceptable. If it is not, stop and
 reconsider Compose Multiplatform before writing any Rust.
+
+### Found while scaffolding
+
+**Fonts are loaded from Google Fonts at runtime.** `frontend/index.html` pulls Syne and
+Outfit over the network. In a local-first desktop app that is wrong three times over: the
+app falls back to system fonts when offline, Tauri's CSP has to be opened up to allow it,
+and a local-first app should not phone a third party on every launch. Fix by vendoring
+the two families via `@fontsource/syne` and `@fontsource/outfit` and importing them in
+`main.ts`. Do this in Phase 0 so the spike measures the real thing.
+- [ ] Vendor Syne and Outfit, drop the `<link>` tags from `index.html`
+
+**`index.html` references `/favicon.svg`, which does not exist.** There is no `public/`
+directory. Harmless in the browser, but it should be replaced by the generated icon.
+
+**CSP is currently `null`** in `tauri.conf.json`, which is permissive. Acceptable for the
+spike. Tighten it in Phase 5, once the resolver hosts are known.
 
 Also do now, independent of the spike:
 - [ ] Check the Spotify developer dashboard for grandfathered user count and client ID count
@@ -138,10 +170,13 @@ Tasks:
 - [ ] Rewrite `releases.ts`, `genres.ts`, `stats.ts` bodies
 - [ ] Delete `api/axios.ts`, `api/axios.test.ts`, `api/auth.ts`, `api/profile.ts`
 - [ ] Delete `stores/auth.ts`, `stores/auth.test.ts`
-- [ ] Delete `views/LoginView.vue`, `views/RegisterView.vue`, `views/ProfileView.vue`
-- [ ] Strip auth guards and the login/register/profile routes from `router/index.ts`
+- [ ] Delete `views/LoginView.vue`, `views/RegisterView.vue`
+- [ ] Gut `views/ProfileView.vue` into a local Settings view: keep the route and the panel
+      styling, drop display name, email and password change, leave a placeholder section
+      for the Phase 4 provider toggles
+- [ ] Strip auth guards and the login/register routes from `router/index.ts`, and remove
+      the `/spike` route and its guard exemption
 - [ ] Remove the `fetchMe()` call from `main.ts`
-- [ ] Rewrite `ProfileView` later as a local Settings view (Phase 4 needs it for credentials)
 - [ ] Keep `stores/releases.test.ts` and the component tests; retarget mocks from axios to `invoke`
 
 Note `stores/releases.ts` (115 lines) and the views should need no changes beyond the
@@ -276,8 +311,15 @@ Conflict model, which the existing data model already gives us for free:
   and `components/release/`, plus Playwright as a dependency.
 - `CLAUDE.md` says the highest migration is `009`. It is `010-rating-decimal.sql`.
 
+## Decisions taken
+
+- **`ProfileView` is rebuilt as a local Settings view.** It keeps its route and its panel
+  styling, and loses the account fields. It gains, in Phase 4, the per-provider metadata
+  toggles and the OAuth connect buttons. `displayName`, email and password change all go.
+  This means `ProfileView.vue` is *not* deleted in Phase 1 as originally written. It is
+  gutted and refilled. The Phase 1 checklist has been amended accordingly.
+
 ## Open decisions
 
-1. Keep `ProfileView` as a local Settings view, or build a fresh one?
-2. Ship Spotify at all in v1, given it is on a deprecation path?
-3. Is the Postgres data import needed, or start the local DB empty?
+1. Ship Spotify at all in v1, given it is on a deprecation path?
+2. Is the Postgres data import needed, or start the local DB empty?
