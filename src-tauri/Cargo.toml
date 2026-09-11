@@ -34,6 +34,10 @@ sqlx = { version = "0.8", default-features = false, features = [
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tempfile = "3"
 
+# Fat LTO in a single codegen unit: the slowest configuration to build and the smallest
+# binary, 4.2 MB against 8.2 MB for thin LTO across 16 units. Worth it because release
+# builds happen once per release and the dev loop does not use this profile at all.
+# Measured on 24 cores, one-line change: 74 s here, 23 s thin, 5.5 s dev.
 [profile.release]
 codegen-units = 1
 lto = true

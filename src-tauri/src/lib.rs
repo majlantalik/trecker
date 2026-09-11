@@ -32,6 +32,7 @@ pub fn run() {
             commands::releases_update,
             commands::releases_delete,
             commands::releases_resolve,
+            commands::releases_refresh_metadata,
             commands::releases_search_catalog,
             commands::genres_list,
             commands::stats_activity,

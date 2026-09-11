@@ -9,6 +9,15 @@
           label="Log"
           @click="showLogModal = true"
         />
+        <Button
+          icon="pi pi-refresh"
+          severity="secondary"
+          text
+          :loading="refreshing"
+          v-tooltip.bottom="'Refresh metadata from MusicBrainz'"
+          aria-label="Refresh metadata"
+          @click="refreshMetadata"
+        />
         <Button icon="pi pi-trash" severity="danger" text @click="confirmDelete" />
       </div>
     </div>
@@ -273,6 +282,7 @@ const addingLink = ref(false)
 const newLinkUrl = ref('')
 const datePopoverRef = ref<InstanceType<typeof Popover> | null>(null)
 const dateDraft = ref<Date | null>(null)
+const refreshing = ref(false)
 
 // Auto-focus directive for inline edit inputs
 const vFocus = {
@@ -298,6 +308,47 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+// Metadata is fetched once when a release is added and never again, so improvements to
+// the resolver only ever help new additions. This is the repair path for the rest.
+// Catalog fields only: rating, notes, status and links are untouched.
+async function refreshMetadata() {
+  if (!release.value || refreshing.value) return
+  refreshing.value = true
+  try {
+    const before = release.value
+    const updated = await releasesApi.refreshMetadata(release.value.id)
+    release.value = updated
+
+    const changes = [
+      before.albumArtUrl !== updated.albumArtUrl && 'artwork',
+      before.releaseYear !== updated.releaseYear && 'year',
+      before.country !== updated.country && 'country',
+      before.genres.join() !== updated.genres.join() && 'genres',
+      before.artist !== updated.artist && 'artist',
+      before.title !== updated.title && 'title'
+    ].filter(Boolean)
+
+    toast.add({
+      severity: changes.length ? 'success' : 'info',
+      summary: changes.length ? 'Metadata updated' : 'Already up to date',
+      detail: changes.length ? `Changed: ${changes.join(', ')}.` : 'Nothing new to fetch.',
+      life: 4000
+    })
+
+    // fetchGenres() short-circuits once loaded, so feed new names in directly.
+    updated.genres.forEach((g) => genresStore.addGenre(g))
+  } catch (e: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Refresh failed',
+      detail: e?.message ?? 'Could not reach MusicBrainz.',
+      life: 5000
+    })
+  } finally {
+    refreshing.value = false
+  }
+}
 
 function onLogged(updated: Release) {
   release.value = updated

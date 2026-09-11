@@ -443,6 +443,66 @@ async fn unrated_releases_are_excluded_from_rankings() {
     assert_eq!(stats::activity(&pool).await.unwrap().len(), 1);
 }
 
+/// Refresh repairs a record whose metadata was captured before the resolver understood
+/// release groups: no artwork, and the country of whichever pressing the search matched.
+/// Hits the live services, so it is excluded from normal runs.
+#[tokio::test]
+#[ignore = "makes real network requests"]
+async fn refresh_repairs_stale_metadata_without_touching_user_data() {
+    use crate::commands::refresh_metadata;
+    use crate::resolve::Resolver;
+
+    let (_d, pool) = fresh().await;
+    let created = releases::create(&pool, req("Avenged Sevenfold", "City of Evil"))
+        .await
+        .unwrap();
+
+    // Put it in the state the real library was in, and add the user's own data alongside.
+    releases::update(
+        &pool,
+        &created.id,
+        ReleaseUpdateRequest {
+            country: Some("CA".into()),
+            status: Some(ReleaseStatus::Listened),
+            rating: Some(4.5),
+            notes: Some("loud".into()),
+            date_listened: Some("2026-02-01T12:00:00Z".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    let refreshed = refresh_metadata(&pool, &Resolver::new("0.1.0-test"), &created.id)
+        .await
+        .unwrap();
+
+    // Catalog fields repaired.
+    assert_eq!(refreshed.country.as_deref(), Some("US"), "the band, not the pressing");
+    assert!(refreshed.album_art_url.is_some(), "artwork from the release group");
+    assert!(refreshed.album_art_url.unwrap().starts_with("https://"));
+    assert!(!refreshed.genres.is_empty());
+    assert_eq!(refreshed.release_year, Some(2005));
+
+    // Everything that is the user's is untouched.
+    assert_eq!(refreshed.status, ReleaseStatus::Listened);
+    assert_eq!(refreshed.rating, Some(4.5));
+    assert_eq!(refreshed.notes.as_deref(), Some("loud"));
+    assert_eq!(refreshed.date_listened.as_deref(), Some("2026-02-01T12:00:00Z"));
+}
+
+#[tokio::test]
+async fn refresh_of_a_missing_release_is_not_found() {
+    use crate::commands::refresh_metadata;
+    use crate::resolve::Resolver;
+
+    let (_d, pool) = fresh().await;
+    // No network is reached: the lookup fails before the resolver is consulted.
+    assert!(refresh_metadata(&pool, &Resolver::new("0.1.0-test"), "nope")
+        .await
+        .is_err());
+}
+
 #[tokio::test]
 async fn data_survives_reopening_the_database() {
     let dir = tempfile::tempdir().unwrap();

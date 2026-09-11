@@ -16,11 +16,32 @@ Everything runs from the repo root. There is no Docker in the loop any more.
 ```bash
 npm install            # installs the Tauri CLI at the root, once
 npm run dev            # Vite + the Tauri window, hot reload
-npm run build          # production bundle
-npm run build:nobundle # production binary only, much faster
+npm run build          # release bundles: .deb and .AppImage
+npm run build:deb      # .deb only, skips the 77 MB AppImage
+npm run build:fast     # debug .deb, for when you need something installable now
+npm run build:nobundle # binary only
 npm test               # frontend tests
-cargo test --manifest-path src-tauri/Cargo.toml --lib   # Rust tests
+npm run test:rust      # Rust tests
+npm run test:net       # the three network tests, excluded from test:rust
 ```
+
+### Build times
+
+Measured on 24 cores, one-line Rust change, warm cache:
+
+| | time |
+|---|---|
+| `npm run dev` rebuild | 5.5 s |
+| `npm run build:fast` | 21 s |
+| `npm run build` | 74 s |
+
+**Do not reach for `npm run build` while iterating.** The release profile uses fat LTO in
+a single codegen unit, which optimises the whole binary at once and so leaves 23 of 24
+cores idle. That is deliberate: it halves the binary, 4.2 MB against 8.2 MB for thin LTO,
+and release builds happen once per release. `npm run dev` is the loop.
+
+If 74 s ever becomes the bottleneck, a faster linker (`mold`) is the next lever; none is
+installed.
 
 **Linux needs the webview headers** before anything will compile:
 
@@ -30,24 +51,22 @@ sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
   build-essential curl wget file libssl-dev pkg-config
 ```
 
-Use `cargo check` while iterating; a full `cargo build` writes gigabytes to
-`src-tauri/target/`.
+Use `cargo check` for a syntax and type pass in about a second; a full `cargo build`
+writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-44 Rust tests and 30 frontend tests. The Rust integration tests in
+47 Rust tests and 31 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
-Three network tests hit the live MusicBrainz and Cover Art Archive services and are
-excluded from normal runs:
+Five further tests hit the live MusicBrainz and Cover Art Archive services and are
+excluded from normal runs. `npm run test:net` runs them, and passes `--test-threads=1`,
+which is required: the MusicBrainz rate limiter lives on the `Resolver`, each test builds
+its own, and parallel runs trip the limit and get a 503.
 
-```bash
-cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored --test-threads=1
-```
-
-`--test-threads=1` is required: the MusicBrainz rate limiter lives on the `Resolver` and
-each test builds its own, so parallel runs trip the limit and get a 503.
+Run them after touching `resolve/`. Every bug in that module so far was found this way and
+by none of the offline tests.
 
 ## Architecture
 
@@ -56,7 +75,7 @@ frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api
 src-tauri/    The Rust core.
   migrations/ sqlx migrations, replacing Liquibase
   src/
-    commands.rs   the #[tauri::command] surface, 15 commands
+    commands.rs   the #[tauri::command] surface, 16 commands
     db.rs         pool, pragmas, migration runner, DbInfo diagnostics
     domain.rs     wire types, mirroring frontend/src/types/index.ts
     error.rs      AppError, serialized to the frontend as { code, message }
@@ -99,6 +118,17 @@ Archive for artwork, both best-effort.
 credential that cannot ship in a binary. A pasted streaming URL is saved as a link with
 sharing parameters stripped; nothing is queried through it. Bandcamp and Apple Music put
 the artist and album in the URL path, so those are read and searched.
+
+**Never trust the pressing a search matched.** MusicBrainz search returns one *release*,
+and which one is close to arbitrary: its year is that edition's, its country is wherever
+that edition was sold, and it often has no cover art even when the album does. The release
+*group* is the album, and `mb_release_details` fetches it in the same request that gets
+genres and the artist's country. All three of those were live bugs.
+
+**`releases_refresh_metadata` is the repair path.** Metadata is written once at add time
+and never revisited, so any improvement here only helps new additions until a user hits
+refresh. It rewrites catalog fields only and never touches rating, notes, status, dates or
+links.
 
 ## Key gotchas
 

@@ -4,13 +4,17 @@
   "private": true,
   "description": "Local-first music listening tracker. Workspace root for the Tauri shell.",
   "scripts": {
-    "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
+    "build:deb": "tauri build --bundles deb",
+    "build:fast": "tauri build --debug --bundles deb",
     "build:nobundle": "tauri build --no-bundle",
+    "tauri": "tauri",
     "web:dev": "npm --prefix frontend run dev",
     "web:build": "npm --prefix frontend run build",
-    "test": "npm --prefix frontend run test"
+    "test": "npm --prefix frontend run test",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --lib",
+    "test:net": "cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored --test-threads=1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

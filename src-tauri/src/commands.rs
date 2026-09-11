@@ -1,11 +1,11 @@
 //! The command surface.
 //!
-//! These fourteen commands map one to one onto the functions that used to live in
-//! `frontend/src/api/*.ts`, plus one diagnostics command for the Settings view.
+//! These commands map one to one onto the functions in `frontend/src/api/*.ts`.
+//! `frontend/src/api/commands.test.ts` asserts every name and argument key.
 
 use crate::db::{Db, DbInfo};
 use crate::domain::*;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::repo;
 use crate::resolve::Resolver;
 use tauri::State;
@@ -55,6 +55,56 @@ pub async fn releases_resolve(
     request: ResolveRequest,
 ) -> AppResult<ResolvedMetadata> {
     resolver.resolve(request).await
+}
+
+#[tauri::command]
+pub async fn releases_refresh_metadata(
+    db: State<'_, Db>,
+    resolver: State<'_, Resolver>,
+    id: String,
+) -> AppResult<Release> {
+    refresh_metadata(&db.pool, &resolver, &id).await
+}
+
+/// The body of `releases_refresh_metadata`, free of Tauri state so it can be tested.
+pub async fn refresh_metadata(
+    pool: &sqlx::SqlitePool,
+    resolver: &Resolver,
+    id: &str,
+) -> AppResult<Release> {
+    let current = repo::releases::get(pool, id).await?;
+
+    let found = resolver
+        .resolve(ResolveRequest {
+            query: Some(format!("{} - {}", current.artist, current.title)),
+            url: None,
+        })
+        .await?;
+
+    // A lookup that comes back with nothing recognisable must not wipe what is already
+    // there. Refusing is better than overwriting a good record with an empty one.
+    if found.artist.is_none() && found.title.is_none() {
+        return Err(AppError::Resolve(format!(
+            "no metadata found for '{} - {}'",
+            current.artist, current.title
+        )));
+    }
+
+    repo::releases::update(
+        pool,
+        id,
+        ReleaseUpdateRequest {
+            artist: found.artist,
+            title: found.title,
+            release_year: found.release_year,
+            album_art_url: found.album_art_url,
+            country: found.country,
+            // Empty genres mean the providers had none, not that yours should go.
+            genres: (!found.genres.is_empty()).then_some(found.genres),
+            ..Default::default()
+        },
+    )
+    .await
 }
 
 #[tauri::command]

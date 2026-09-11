@@ -65,6 +65,11 @@ describe('releases commands', () => {
     expect(invoke).toHaveBeenCalledWith('releases_delete', { id: 'abc' })
   })
 
+  it('refreshMetadata sends the id', async () => {
+    await releasesApi.refreshMetadata('abc')
+    expect(invoke).toHaveBeenCalledWith('releases_refresh_metadata', { id: 'abc' })
+  })
+
   it('searchCatalog applies the default limit', async () => {
     await releasesApi.searchCatalog('slint')
     expect(invoke).toHaveBeenCalledWith('releases_search_catalog', { q: 'slint', limit: 10 })

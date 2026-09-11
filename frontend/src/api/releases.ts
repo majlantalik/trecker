@@ -38,6 +38,10 @@ export const releasesApi = {
     await invoke<void>('releases_delete', { id })
   },
 
+  async refreshMetadata(id: string): Promise<Release> {
+    return invoke<Release>('releases_refresh_metadata', { id })
+  },
+
   async searchCatalog(q: string, limit = 10): Promise<ResolvedMetadata[]> {
     return invoke<ResolvedMetadata[]>('releases_search_catalog', { q, limit })
   }

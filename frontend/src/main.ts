@@ -4,6 +4,7 @@ import PrimeVue from 'primevue/config'
 import Aura from '@primevue/themes/aura'
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
+import Tooltip from 'primevue/tooltip'
 import 'primeicons/primeicons.css'
 
 // Fonts are bundled, not fetched from Google at runtime. A local-first app must render
@@ -35,6 +36,7 @@ app.use(PrimeVue, {
 })
 app.use(ToastService)
 app.use(ConfirmationService)
+app.directive('tooltip', Tooltip)
 
 // Nothing to resolve before mounting any more: there is no session to fetch and no
 // navigation guard to satisfy. The data lives on this machine.

@@ -64,6 +64,12 @@ Everything you have not listened to yet.
 
 **Log it** saves and returns; **Log + Details** saves and opens the Entry page.
 
+### Refreshing metadata
+
+Metadata is fetched once when you add a release. If it came back wrong or incomplete, the
+refresh button on a release's page fetches it again. It replaces artist, title, year,
+country, artwork and genres, and never touches your rating, notes, dates or links.
+
 ### Library
 
 Everything you have listened to, as a table or a grid. Filter by free-text search, status,
@@ -126,9 +132,16 @@ All commands from the repo root.
 ```bash
 npm install            # Tauri CLI, once
 npm run dev            # Vite + the Tauri window, hot reload
-npm run build          # production bundle (.deb, .AppImage, .dmg, .msi)
-npm run build:nobundle # production binary only, faster
+npm run build          # release bundles: .deb and .AppImage
+npm run build:deb      # .deb only, skips the 77 MB AppImage
+npm run build:fast     # debug .deb, when you just need something installable
+npm run build:nobundle # binary only
 ```
+
+Measured on 24 cores after a one-line Rust change: `npm run dev` rebuilds in 5.5 s,
+`build:fast` in 21 s, `build` in 74 s. The release profile is deliberately the slowest
+configuration, fat link-time optimisation in one codegen unit, because it halves the
+binary. Iterate with `npm run dev`, not with `npm run build`.
 
 > `cargo build --release` on its own produces a binary that tries to reach the dev server.
 > Always build through the Tauri CLI.
@@ -136,20 +149,14 @@ npm run build:nobundle # production binary only, faster
 ### Tests
 
 ```bash
-npm test                                                 # 30 frontend tests
-cargo test --manifest-path src-tauri/Cargo.toml --lib    # 44 Rust tests
+npm test           # 31 frontend tests
+npm run test:rust  # 47 Rust tests
+npm run test:net   # 5 tests against the live metadata services
 ```
 
 The Rust integration tests run against a real temporary SQLite file through the real
-migration. Three further tests hit the live MusicBrainz and Cover Art Archive services and
-are excluded by default:
-
-```bash
-cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored --test-threads=1
-```
-
-`--test-threads=1` is required, because the MusicBrainz rate limiter is per-`Resolver` and
-parallel tests trip it.
+migration. The network tests are excluded from `test:rust` and run single-threaded,
+because the MusicBrainz rate limiter is per-`Resolver` and parallel tests trip it.
 
 ### Project structure
 
@@ -191,7 +198,7 @@ Art Archive are open, and everything else is local.
 
 ### Command surface
 
-Fifteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
+Sixteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
 | Command | Purpose |
 |---|---|
@@ -202,6 +209,7 @@ Fifteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `releases_get` | Fetch one release |
 | `releases_update` | Partial update; `status=LISTENED` stamps `dateListened` |
 | `releases_delete` | Stop tracking; the catalog row stays |
+| `releases_refresh_metadata` | Re-fetch catalog fields for an existing release |
 | `releases_search_catalog` | Full-text autocomplete over the catalog |
 | `genres_list` | Every known genre |
 | `stats_activity` | Listening count by year and month |
