@@ -7,22 +7,30 @@ Target: local-first desktop app for Windows, macOS and Linux. Mobile deferred.
 
 1. **The Vue app is not rewritten.** All 42 frontend files stay. Only `src/api/*.ts` changes.
 2. **The catalog / tracking table split survives.** It is the thing that makes sync tractable later. Do not collapse it just because there is one local user.
-3. **MusicBrainz is the primary resolver.** Spotify becomes optional enrichment. See "Spotify position" below.
+3. **MusicBrainz is the only resolver.** The streaming services are link-only. See below.
 4. **`backend/` is frozen, not deleted.** It becomes the Phase 6 sync server.
 5. Each phase ends with a working app. No phase leaves `main` of this branch broken.
 
-## Spotify position
+## Streaming services: link-only
 
-Spotify cannot be the backbone. Development Mode is capped at 5 allowlisted users,
-requires the app owner to hold Premium, and Spotify has stated it is moving away from
-the Client Credentials flow for metadata endpoints, which is our only use of it.
-Extended Quota requires 250k monthly active users.
+None of the three can be queried from a shipped binary, because none of them can be
+queried without a credential that would have to ship with it.
 
-Consequences baked into this plan:
-- MusicBrainz + Cover Art Archive are the default path and need no credentials at all.
-- Spotify, Tidal and YouTube ship disabled, enabled per user in settings.
-- No client secret ever ships in the binary. Authorization Code + PKCE only.
-- Resolver architecture must degrade cleanly when a provider is off or fails.
+Spotify Development Mode caps an app at 5 allowlisted users and requires the app owner to
+hold a Premium subscription; Extended Quota requires 250,000 monthly active users. Tidal
+uses the same client-credentials flow and so has the same problem. A YouTube API key is
+extractable from any binary it ships in, and the quota it spends is the developer's.
+
+Bring-your-own-credentials was considered and rejected: asking every user to hold a
+Premium subscription and register a developer app before they can add an album is not
+reasonable.
+
+What Trecker does instead:
+- MusicBrainz for identity and genres, the Cover Art Archive for artwork. Neither needs
+  an account, a key or an approval.
+- A pasted streaming URL is saved as a link. Sharing and tracking parameters are stripped.
+- Bandcamp and Apple Music URLs carry the artist and album in the path, so those are read
+  and searched. Spotify and Tidal ids are opaque and yield nothing, correctly.
 
 ---
 
@@ -41,12 +49,13 @@ trecker/
       main.rs
       lib.rs
       error.rs              # AppError -> serializable to the frontend
-      db/mod.rs             # pool setup, PRAGMAs, migration runner
-      domain/               # Release, UserRelease, Genre structs
+      db.rs                 # pool setup, PRAGMAs, migration runner
+      domain.rs             # wire types, mirroring frontend/src/types/index.ts
       repo/                 # sqlx queries
-      query/filter.rs       # port of UserReleaseSpecification
-      commands/             # #[tauri::command] surface
-      resolve/              # metadata providers
+        filter.rs           # port of UserReleaseSpecification
+        integration.rs      # tests against a real database
+      commands.rs           # #[tauri::command] surface
+      resolve/              # MusicBrainz + Cover Art Archive
 ```
 
 ### Crates
@@ -54,16 +63,16 @@ trecker/
 | Crate | Purpose |
 |---|---|
 | `tauri` 2 | shell, commands, bundling |
-| `sqlx` (sqlite, runtime-tokio, tls-rustls, uuid, chrono, migrate) | DB + migrations |
-| `reqwest` (rustls-tls, json) | resolver HTTP |
-| `tokio` | async runtime, `try_join!`, `timeout` |
-| `serde` / `serde_json` | command payloads |
-| `uuid` (v4, serde) | IDs, stored as TEXT |
-| `chrono` (serde) | timestamps, stored as RFC3339 TEXT |
+| `sqlx` (sqlite, runtime-tokio, migrate) | DB + migrations |
+| `reqwest` (rustls-tls, json, gzip) | resolver HTTP |
+| `tokio` | async runtime, timeouts, the rate-limit gate |
+| `serde` / `serde_json` | command payloads, provider responses |
 | `thiserror` | error enum |
-| `keyring` | OAuth tokens in the OS keychain (Phase 4) |
-| `tauri-plugin-deep-link` | OAuth callback (Phase 4) |
 | `tauri-plugin-updater` | auto-update (Phase 5) |
+
+`uuid` and `chrono` were on this list and are not used. Ids are text and timestamps are
+RFC3339 text, so generating both is a few lines each. `keyring` and
+`tauri-plugin-deep-link` were here for OAuth, which is not happening.
 
 Deliberately **not** using `tauri-plugin-sql`. It exposes SQL to the JS side; we want
 typed queries in Rust and a narrow command surface.
@@ -440,22 +449,86 @@ artist and title, click Add, and confirm the release lands in the queue.
 
 Reordered so the free, unauthenticated provider lands first.
 
-- [ ] `resolve/musicbrainz.rs` (from 279 Java lines). `reqwest` with the required
-      `User-Agent`. Enforce the 1 request/second limit with a shared
-      `tokio::time::Interval`, not a sleep per call.
-- [ ] `resolve/coverart.rs` for Cover Art Archive, including the retry-on-transient
-      behaviour from commit `f640c1c`
-- [ ] `resolve/mod.rs` (from `MetadataResolverService`, 210 lines). Input-type detection
-      stays as is. `Mono.zip()` becomes `tokio::try_join!`; the 8 second budget becomes
-      `tokio::time::timeout`.
-- [ ] Provider trait so a disabled or failing provider degrades instead of failing the resolve
+- [x] `resolve/musicbrainz.rs` (from 279 Java lines). `reqwest` with the required
+      `User-Agent` and a real one-per-second gate.
+- [x] `resolve/coverart.rs` for Cover Art Archive, including retry on transient failures
+- [x] `resolve/mod.rs` (from `MetadataResolverService`, 210 lines)
+- [x] Enrichment degrades instead of failing the resolve
 
-Then, behind a settings toggle and only if wanted:
-- [ ] Settings view and a `settings` table for per-provider enablement
-- [ ] Authorization Code + PKCE with `tauri-plugin-deep-link` for the callback
-- [ ] OAuth tokens in the OS keychain via `keyring`, never in the SQLite file
-- [ ] Spotify: expect the 5-user cap and the Client Credentials deprecation. Treat any
-      Spotify work as disposable.
+**Streaming providers are not implemented and will not be.** Decision recorded below.
+
+**Exit criterion: MET.** Verified against the live services:
+
+```
+artist:         Slint
+title:          Spiderland
+release_year:   1991
+album_art_url:  coverartarchive.org/release/266e8eb6-.../19590732868-500.jpg
+country:        US
+genres:         alternative rock, rock
+musicbrainz_id: 266e8eb6-244f-450d-b419-7e3cdf815d4c
+```
+
+44 Rust tests pass, plus 3 network tests excluded from normal runs. Run those with
+`cargo test --lib -- --ignored --test-threads=1`; the single thread is required because
+the rate limiter is per-Resolver and three parallel tests get a 503.
+
+### Why the streaming providers are gone
+
+All three fail the same way: the credential cannot travel in a shipped binary.
+
+| | Needs | Why it cannot ship |
+|---|---|---|
+| Spotify | client secret, or per-user OAuth | Dev Mode caps at 5 allowlisted users and the owner must hold Premium |
+| Tidal | client secret | same client-credentials flow, same problem |
+| YouTube | API key | extractable from the binary, and the quota is the developer's to lose |
+
+Bring-your-own-credentials was considered and rejected. It would require every user to
+hold a Spotify Premium subscription, create a developer app and accept the developer
+terms, to add an album. That is not a reasonable thing to ask.
+
+So a pasted streaming URL is **kept as a link, not resolved**. The link is what the user
+wanted to save anyway. Sharing parameters (`si=`, `utm_*`) are stripped, because they
+identify whoever shared it and do not belong in a library.
+
+Bandcamp and Apple Music put the artist and album in the URL path, so those *are* read and
+searched. Spotify and Tidal use opaque ids, which yield nothing, and that is the right
+outcome: an empty form with the link saved beats a confident match on a random string.
+
+### Three things the live run caught that tests could not
+
+**The year was wrong.** A MusicBrainz release search returns one *pressing*. Searching
+"Slint - Spiderland" landed on a 2014 reissue and reported 2014. The release group carries
+`first-release-date`, which is the album's own date, and it now wins. The Java had this
+bug too.
+
+**The country was `XW`.** That is MusicBrainz for "worldwide", a correct answer to where
+a record was released and a useless one for a By Country chart. `XW`, `XE` and friends are
+now treated as absent so the artist-country lookup fills in, which turned `XW` into `US`.
+
+**503 was not being retried.** MusicBrainz answers "currently busy" under load, and both
+the Java and the first cut of this port retried only transport failures, so a busy server
+looked exactly like a release that does not exist. 429, 500, 502, 503 and 504 now back off
+and retry, honouring `Retry-After`; 404 still does not, because retrying it burns the
+one-per-second budget three times to learn the same thing.
+
+### Other deviations from the Java
+
+**The rate limiter is a gate, not a sleep.** The Java slept 1100ms before every call. That
+delayed the first request of the day for no reason, and did not actually stop two
+concurrent calls firing together. A mutex over the last-request time serialises requests
+and skips the wait when enough time has already passed.
+
+**Lucene input is escaped.** The Java interpolated the artist and title straight into the
+query, so an album with a quote, a colon or a slash in its name produced a malformed
+search and silently no results. "AC/DC" was enough to trigger it.
+
+**Genres come from MusicBrainz.** They used to come from Spotify, so they would otherwise
+have been lost along with the By Genre chart. Taken from the release, falling back to the
+release group, ranked by vote count and capped at five.
+
+**No provider trait.** With one provider there is nothing to abstract over. The enrichment
+steps already degrade independently, which is what the trait was for.
 
 ---
 
@@ -492,6 +565,10 @@ Conflict model, which the existing data model already gives us for free:
 - `CLAUDE.md` says the highest migration is `009`. It is `010-rating-decimal.sql`.
 
 ## Decisions taken
+
+- **No Spotify, Tidal or YouTube lookups.** Their credentials cannot ship in a binary and
+  bring-your-own would require every user to hold a paid subscription and register a
+  developer app. Their links are saved; nothing is queried through them.
 
 - **`ProfileView` is rebuilt as a local Settings view.** It keeps its route and its panel
   styling, and loses the account fields. It gains, in Phase 4, the per-provider metadata

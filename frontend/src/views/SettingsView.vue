@@ -97,8 +97,9 @@
           <Tag :value="p.state" :severity="p.severity" />
         </div>
         <p class="form-hint">
-          MusicBrainz needs no account and is always on. The streaming services will each
-          require connecting your own account.
+          MusicBrainz and the Cover Art Archive need no account and are always on. The
+          streaming services require a developer account and a paid subscription to query,
+          so Trecker saves their links but does not look anything up through them.
         </p>
       </div>
     </div>
@@ -137,14 +138,16 @@ function formatBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
-// Providers are declared here rather than fetched: nothing is configurable until the
-// OAuth work lands, and a toggle that does nothing is worse than an honest label.
+// Declared here rather than fetched: nothing is configurable, and a toggle that does
+// nothing would be worse than an honest label.
 const providers = [
-  { name: 'MusicBrainz', note: 'no account needed', state: 'Built in', severity: 'success' },
-  { name: 'Cover Art Archive', note: 'no account needed', state: 'Built in', severity: 'success' },
-  { name: 'Spotify', note: 'your own account', state: 'Not yet', severity: 'secondary' },
-  { name: 'Tidal', note: 'your own account', state: 'Not yet', severity: 'secondary' },
-  { name: 'YouTube', note: 'your own account', state: 'Not yet', severity: 'secondary' }
+  { name: 'MusicBrainz', note: 'artist, album, year, country, genres', state: 'Built in', severity: 'success' },
+  { name: 'Cover Art Archive', note: 'album artwork', state: 'Built in', severity: 'success' },
+  { name: 'Spotify', note: 'link saved, no lookup', state: 'Link only', severity: 'secondary' },
+  { name: 'Tidal', note: 'link saved, no lookup', state: 'Link only', severity: 'secondary' },
+  { name: 'YouTube', note: 'link saved, no lookup', state: 'Link only', severity: 'secondary' },
+  { name: 'Bandcamp', note: 'link saved, title read from the URL', state: 'Link only', severity: 'secondary' },
+  { name: 'Apple Music', note: 'link saved, title read from the URL', state: 'Link only', severity: 'secondary' }
 ] as const
 
 onMounted(async () => {

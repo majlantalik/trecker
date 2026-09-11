@@ -1,14 +1,13 @@
 //! The command surface.
 //!
 //! These fourteen commands map one to one onto the functions that used to live in
-//! `frontend/src/api/*.ts`, plus one diagnostics command for the Settings view. Phase 4
-//! replaces `releases_resolve` with real providers; nothing else here should move.
+//! `frontend/src/api/*.ts`, plus one diagnostics command for the Settings view.
 
 use crate::db::{Db, DbInfo};
 use crate::domain::*;
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::repo;
-use std::collections::HashMap;
+use crate::resolve::Resolver;
 use tauri::State;
 
 // ---------------------------------------------------------------- releases
@@ -50,27 +49,12 @@ pub async fn releases_delete(db: State<'_, Db>, id: String) -> AppResult<()> {
     repo::releases::delete(&db.pool, &id).await
 }
 
-/// Phase 4 replaces this with the real providers. Until then it parses the one input
-/// shape the plain-text branch of the resolver understands, so Quick Add works.
 #[tauri::command]
-pub async fn releases_resolve(request: ResolveRequest) -> AppResult<ResolvedMetadata> {
-    let raw = request
-        .url
-        .or(request.query)
-        .filter(|s| !s.trim().is_empty())
-        .ok_or_else(|| AppError::Invalid("nothing to resolve".into()))?;
-
-    let (artist, title) = match raw.split_once(" - ") {
-        Some((a, t)) => (a.trim().to_string(), t.trim().to_string()),
-        None => (String::new(), raw.trim().to_string()),
-    };
-
-    Ok(ResolvedMetadata {
-        artist: (!artist.is_empty()).then_some(artist),
-        title: (!title.is_empty()).then_some(title),
-        streaming_links: HashMap::new(),
-        ..Default::default()
-    })
+pub async fn releases_resolve(
+    resolver: State<'_, Resolver>,
+    request: ResolveRequest,
+) -> AppResult<ResolvedMetadata> {
+    resolver.resolve(request).await
 }
 
 #[tauri::command]

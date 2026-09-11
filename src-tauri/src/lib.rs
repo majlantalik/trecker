@@ -3,6 +3,7 @@ mod db;
 mod domain;
 mod error;
 mod repo;
+mod resolve;
 
 use tauri::Manager;
 
@@ -20,6 +21,7 @@ pub fn run() {
             // here rather than surfacing the same error on every command.
             let db = tauri::async_runtime::block_on(db::connect(&dir))?;
             app.manage(db);
+            app.manage(resolve::Resolver::new(app.package_info().version.to_string().as_str()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
