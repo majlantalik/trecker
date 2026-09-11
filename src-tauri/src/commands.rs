@@ -116,11 +116,16 @@ pub async fn releases_search_catalog(
     repo::releases::search_catalog(&db.pool, &q, limit.unwrap_or(10)).await
 }
 
-// ---------------------------------------------------------------- genres
+// ---------------------------------------------------------------- genres and countries
 
 #[tauri::command]
 pub async fn genres_list(db: State<'_, Db>) -> AppResult<Vec<String>> {
     repo::releases::list_genres(&db.pool).await
+}
+
+#[tauri::command]
+pub async fn countries_list(db: State<'_, Db>) -> AppResult<Vec<String>> {
+    repo::releases::list_countries(&db.pool).await
 }
 
 // ---------------------------------------------------------------- stats

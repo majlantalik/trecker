@@ -35,6 +35,7 @@ pub fn run() {
             commands::releases_refresh_metadata,
             commands::releases_search_catalog,
             commands::genres_list,
+            commands::countries_list,
             commands::stats_activity,
             commands::stats_by_genre,
             commands::stats_by_country,

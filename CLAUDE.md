@@ -75,7 +75,7 @@ frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api
 src-tauri/    The Rust core.
   migrations/ sqlx migrations, replacing Liquibase
   src/
-    commands.rs   the #[tauri::command] surface, 16 commands
+    commands.rs   the #[tauri::command] surface, 17 commands
     db.rs         pool, pragmas, migration runner, DbInfo diagnostics
     domain.rs     wire types, mirroring frontend/src/types/index.ts
     error.rs      AppError, serialized to the frontend as { code, message }
@@ -166,6 +166,11 @@ on a pool connection.
 **MusicBrainz needs a real `User-Agent` and one request per second.** The limiter is a gate
 over the last-request time on a single `Resolver` instance managed by Tauri. Do not
 construct a second one.
+
+**Country values are not always ISO codes.** MusicBrainz usually gives a two-letter code,
+but the field is editable and the resolver falls back to an artist's area name like
+"England". `utils/country.ts` degrades to showing the raw string rather than guessing, and
+gives no flag to user-assigned codes such as XW.
 
 **`primeicons` is a separate package** and must stay listed in `package.json`.
 

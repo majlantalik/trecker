@@ -360,6 +360,24 @@ pub async fn list_genres(pool: &SqlitePool) -> AppResult<Vec<String>> {
         .map_err(map_err)
 }
 
+/// Countries that actually appear in the library.
+///
+/// Scoped to tracked releases rather than the whole catalog: offering a filter for a
+/// country you own nothing from can only ever return an empty list. Includes queued
+/// releases, unlike the stats breakdowns, because the library filter covers both.
+pub async fn list_countries(pool: &SqlitePool) -> AppResult<Vec<String>> {
+    sqlx::query_scalar(
+        "SELECT DISTINCT r.country FROM user_releases ur \
+         JOIN releases r ON r.id = ur.release_id \
+         WHERE ur.user_id = ? AND r.country IS NOT NULL AND TRIM(r.country) != '' \
+         ORDER BY r.country COLLATE NOCASE",
+    )
+    .bind(LOCAL_USER_ID)
+    .fetch_all(pool)
+    .await
+    .map_err(map_err)
+}
+
 // ---------------------------------------------------------------- helpers
 
 async fn find_catalog(

@@ -504,6 +504,29 @@ async fn refresh_of_a_missing_release_is_not_found() {
 }
 
 #[tokio::test]
+async fn country_list_covers_the_library_and_nothing_else() {
+    let (_d, pool) = fresh().await;
+    assert!(releases::list_countries(&pool).await.unwrap().is_empty());
+
+    add_listened(&pool, "Alice Coltrane", "Journey", 5.0, "2026-03-01T10:00:00Z", Some("US"), &[]).await;
+    add_listened(&pool, "Ryo Fukui", "Scenery", 4.0, "2026-04-01T10:00:00Z", Some("JP"), &[]).await;
+
+    // Queued releases count too: the library filter covers both statuses.
+    let mut queued = req("Slint", "Spiderland");
+    queued.country = Some("US".into());
+    releases::create(&pool, queued).await.unwrap();
+
+    // No country at all, and a blank one, must not become options.
+    releases::create(&pool, req("Nobody", "Nowhere")).await.unwrap();
+    let mut blank = req("Blank", "Country");
+    blank.country = Some("   ".into());
+    releases::create(&pool, blank).await.unwrap();
+
+    let countries = releases::list_countries(&pool).await.unwrap();
+    assert_eq!(countries, vec!["JP", "US"], "distinct, sorted, no empties");
+}
+
+#[tokio::test]
 async fn data_survives_reopening_the_database() {
     let dir = tempfile::tempdir().unwrap();
     let first = db::connect(dir.path()).await.unwrap();

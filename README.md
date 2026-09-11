@@ -73,7 +73,8 @@ country, artwork and genres, and never touches your rating, notes, dates or link
 ### Library
 
 Everything you have listened to, as a table or a grid. Filter by free-text search, status,
-genre, country, year, rating range and the did-not-finish flag.
+genre, country, year, rating range and the did-not-finish flag. Countries show as flags
+and names, and the country filter offers only the ones you actually have.
 
 ### Stats
 
@@ -198,7 +199,7 @@ Art Archive are open, and everything else is local.
 
 ### Command surface
 
-Sixteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
+Seventeen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
 | Command | Purpose |
 |---|---|
@@ -212,6 +213,7 @@ Sixteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `releases_refresh_metadata` | Re-fetch catalog fields for an existing release |
 | `releases_search_catalog` | Full-text autocomplete over the catalog |
 | `genres_list` | Every known genre |
+| `countries_list` | Countries present in the library, for the filter |
 | `stats_activity` | Listening count by year and month |
 | `stats_by_genre` | Breakdown by genre |
 | `stats_by_country` | Breakdown by country |
