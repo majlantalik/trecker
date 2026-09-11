@@ -12,11 +12,13 @@
         <h2 class="panel-title">Automated checks</h2>
       </div>
       <div class="panel-body">
-        <div v-for="c in checks" :key="c.name" class="check">
+        <!-- <p> rather than <div> so the values land in the accessibility tree, which is
+             how the result is read back on Wayland where screen capture needs a portal grant. -->
+        <p v-for="c in checks" :key="c.name" class="check">
           <span class="check-dot" :class="c.pass ? 'ok' : 'bad'" />
           <span class="check-name">{{ c.name }}</span>
           <span class="check-value">{{ c.value }}</span>
-        </div>
+        </p>
       </div>
     </section>
 
@@ -151,6 +153,13 @@ onMounted(async () => {
     { name: 'devicePixelRatio', pass: true, value: String(window.devicePixelRatio) },
     { name: 'AppleWebKit build', pass: true, value: webkitVersion }
   ]
+
+  // The window title is the one string guaranteed to reach an OS-level inspector, so
+  // publish the verdict there as well as on screen.
+  const failed = checks.value.filter((c) => !c.pass)
+  document.title = failed.length
+    ? `SPIKE FAIL: ${failed.map((c) => c.name).join(', ')}`
+    : `SPIKE PASS ${checks.value.length}/${checks.value.length} (WebKit ${webkitVersion}, DPR ${window.devicePixelRatio})`
 })
 </script>
 
@@ -206,6 +215,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  margin: 0;
   padding: 0.4rem 0;
   font-size: 0.9rem;
 }

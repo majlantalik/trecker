@@ -12,6 +12,11 @@ backend/out/
 frontend/node_modules/
 frontend/dist/
 
+# Tauri workspace root
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+
 # IDE
 .idea/
 *.iml

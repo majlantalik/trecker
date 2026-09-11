@@ -83,7 +83,9 @@ sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
 Then, from the repo root:
 
 ```
-npm --prefix frontend run tauri:dev
+npm install          # installs the Tauri CLI at the workspace root
+npm run dev          # starts Vite and the Tauri window
+npm run build        # production bundle
 ```
 
 ## Phase 0 — Spike (target: one weekend)
@@ -107,6 +109,51 @@ The only risky properties are `backdrop-filter` in `AppLayout.vue:41` (already
 
 **Exit criterion:** the Linux build is visually acceptable. If it is not, stop and
 reconsider Compose Multiplatform before writing any Rust.
+
+### Result: PASSED
+
+Run on WebKitGTK 2.52.6 (WebKit 605.1.15), dev build and production build.
+
+| Check | Chromium baseline | WebKitGTK |
+|---|---|---|
+| `invoke()` round trip | n/a | 3 releases |
+| Syne (display font) | loaded | loaded |
+| Outfit (body font) | loaded | loaded |
+| `backdrop-filter` | unprefixed | unprefixed |
+| `position: sticky` | yes | yes |
+| CSS custom properties | `#00e5b0` | `#00e5b0` |
+| devicePixelRatio | 1 | 1 |
+
+No fallback fonts, no unsupported properties, no rendering divergence. The Chart.js
+canvas, both album-art paths and the half-star widget all appear in the accessibility
+tree. **Proceed with Tauri.**
+
+Production binary, frontend embedded: **4.2 MB**.
+
+### Four things learned that change how we build
+
+**`createWebHistory` works.** A deep route resolves against the embedded asset protocol
+in a production build, so Tauri does SPA fallback. No need to switch to hash history,
+which is the usual advice for Tauri apps. The router stays as it is.
+
+**Never build with plain `cargo build --release`.** That bypasses the Tauri CLI and leaves
+`devUrl` embedded, so the binary tries to reach localhost:5173 and shows a connection
+error. Always go through `npm run build` at the workspace root.
+
+**The Tauri CLI must run from the directory above `src-tauri`.** It searches subfolders
+only, so running it from `frontend/` fails. A root `package.json` now owns the Tauri
+scripts, and `beforeDevCommand` / `beforeBuildCommand` resolve from the workspace root,
+not from `src-tauri`.
+
+**On Wayland, screenshots need a desktop portal grant.** Automated visual checks should
+read the accessibility tree instead, which is why the spike renders its checks as `<p>`
+elements. `GDK_BACKEND=x11` forces XWayland if an X11 tool is needed. Note that
+`document.title` does not propagate to the native window title on WebKitGTK.
+
+### Re-running the spike
+
+Set `app.windows[0].url` to `/spike` in `src-tauri/tauri.conf.json`, then `npm run dev`.
+Remove the key again afterwards.
 
 ### Found while scaffolding
 
