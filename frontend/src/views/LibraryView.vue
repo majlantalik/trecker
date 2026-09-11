@@ -47,7 +47,11 @@
           <Column field="artist" header="Artist" sortable />
           <Column field="title" header="Title" sortable />
           <Column field="releaseYear" header="Year" sortable style="width: 80px" />
-          <Column field="country" header="Country" style="width: 100px" />
+          <Column field="country" header="Country" style="width: 160px">
+            <template #body="{ data }">
+              <CountryLabel :value="data.country" />
+            </template>
+          </Column>
           <Column field="rating" header="Rating" sortable style="width: 130px">
             <template #body="{ data }">
               <HalfStarRating v-if="data.rating" :modelValue="data.rating" readonly />
@@ -118,6 +122,7 @@ import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
+import CountryLabel from '@/components/common/CountryLabel.vue'
 import ProgressSpinner from 'primevue/progressspinner'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Paginator from 'primevue/paginator'

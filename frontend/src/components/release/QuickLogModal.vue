@@ -30,6 +30,10 @@
       <div class="log-field">
         <label>Country</label>
         <InputText v-model="form.country" placeholder="e.g. US, GB, DE" fluid />
+        <!-- Echo back what the code resolves to, so a typo is visible before saving. -->
+        <span v-if="countryPreview" class="country-preview">
+          <CountryLabel :value="form.country" />
+        </span>
       </div>
 
       <div class="log-field">
@@ -54,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
@@ -64,6 +68,8 @@ import Textarea from 'primevue/textarea'
 import InputText from 'primevue/inputtext'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
+import CountryLabel from '@/components/common/CountryLabel.vue'
+import { countryName } from '@/utils/country'
 import GenreTagInput from './GenreTagInput.vue'
 import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
@@ -80,6 +86,12 @@ const emit = defineEmits<{
 const visible = defineModel<boolean>('visible', { default: false })
 const router = useRouter()
 const toast = useToast()
+
+// Only worth showing once the code actually resolves to something other than itself.
+const countryPreview = computed(() => {
+  const v = form.value.country?.trim()
+  return !!v && countryName(v) !== v.toUpperCase()
+})
 const releasesStore = useReleasesStore()
 const genresStore = useGenresStore()
 const saving = ref(false)
@@ -145,6 +157,12 @@ async function handleLog(navigateToEntry: boolean) {
 </script>
 
 <style scoped>
+.country-preview {
+  font-size: 0.78rem;
+  color: rgba(226, 228, 240, 0.55);
+  margin-top: 0.3rem;
+}
+
 .quick-log-content {
   display: flex;
   flex-direction: column;

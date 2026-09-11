@@ -123,7 +123,8 @@
               class="meta-pill editable"
               @click="startEdit('country', release.country ?? '')"
             >
-              {{ release.country ?? 'add country' }}
+              <CountryLabel v-if="release.country" :value="release.country" />
+              <template v-else>add country</template>
             </span>
             <InputText
               v-else
@@ -257,6 +258,7 @@ import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
+import CountryLabel from '@/components/common/CountryLabel.vue'
 import QuickLogModal from '@/components/release/QuickLogModal.vue'
 import GenreTagInput from '@/components/release/GenreTagInput.vue'
 import { releasesApi } from '@/api/releases'
