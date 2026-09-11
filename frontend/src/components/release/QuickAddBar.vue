@@ -15,7 +15,7 @@
           option: { style: 'padding: 0.4rem 0.875rem;' }
         }"
         option-label="title"
-        placeholder="Paste a Spotify/Tidal link or type an artist + album..."
+        placeholder="Type an artist and album, or paste a link..."
         auto-highlight
       >
         <template #option="{ option }">

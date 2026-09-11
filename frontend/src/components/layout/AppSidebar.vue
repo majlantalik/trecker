@@ -49,10 +49,12 @@ import { useReleasesStore } from '@/stores/releases'
 
 const releasesStore = useReleasesStore()
 
-const queueCount = computed(() => releasesStore.total)
+// queuedTotal, not total: `total` belongs to whichever list was fetched last, so this
+// badge used to show the Library count while sitting next to the word "Queue".
+const queueCount = computed(() => releasesStore.queuedTotal)
 
 onMounted(() => {
-  releasesStore.fetchReleases({ status: 'QUEUED', size: 1 })
+  releasesStore.refreshQueuedCount()
 })
 </script>
 
