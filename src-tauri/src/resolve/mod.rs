@@ -20,13 +20,16 @@
 pub mod coverart;
 pub mod musicbrainz;
 
-use crate::domain::{ResolveRequest, ResolvedMetadata};
+use crate::domain::{AlbumCandidate, ResolveRequest, ResolvedMetadata};
 use crate::error::{AppError, AppResult};
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 /// Per-request budget. Matches the 8 seconds the Java allowed.
 pub const TIMEOUT: Duration = Duration::from_secs(8);
+
+/// How many albums a quick add search offers to choose from.
+pub const SEARCH_RESULTS: usize = 10;
 
 /// Whole-resolve budget. Larger than TIMEOUT because a resolve makes up to three
 /// sequential calls: a search and a lookup a second apart behind the MusicBrainz gate,
@@ -87,6 +90,20 @@ impl Resolver {
         self.search(&raw)
             .await
             .ok_or_else(|| AppError::Resolve(format!("nothing found for '{raw}'")))
+    }
+
+    /// Albums matching typed text, most likely first, for the person to choose from.
+    ///
+    /// An error means MusicBrainz could not be reached. Nothing found is an empty list.
+    pub async fn search_albums(&self, query: &str) -> AppResult<Vec<AlbumCandidate>> {
+        let query = query.trim();
+        if query.is_empty() {
+            return Err(AppError::Invalid("nothing to search for".into()));
+        }
+        tokio::time::timeout(TOTAL_BUDGET, self.mb_search_release_groups(query, SEARCH_RESULTS))
+            .await
+            .map_err(|_| AppError::Resolve("search timed out".into()))?
+            .ok_or_else(|| AppError::Resolve("could not reach MusicBrainz".into()))
     }
 
     /// Finds an album by text, then fills it out from its release group.
@@ -381,5 +398,31 @@ mod tests {
         assert_eq!(found.artist.as_deref(), Some("Avenged Sevenfold"));
         assert_eq!(found.title.as_deref(), Some("City of Evil"));
         assert_eq!(found.release_year, Some(2005));
+    }
+
+    /// The case that prompted multi-result search: no separator, artist and title run
+    /// together. It found nothing when the whole text was searched as a title.
+    #[tokio::test]
+    #[ignore = "makes real network requests"]
+    async fn search_offers_several_albums_with_the_album_first() {
+        let r = Resolver::new("0.1.0-test");
+        let found = r.search_albums("avenged sevenfold nightmare").await.unwrap();
+        println!("{found:#?}");
+        assert!(found.len() >= 2, "the album and its single at least");
+        assert_eq!(found[0].title.as_deref(), Some("Nightmare"));
+        assert_eq!(found[0].primary_type.as_deref(), Some("Album"));
+        assert!(found.len() <= SEARCH_RESULTS);
+    }
+
+    /// An extra word empties the precise query. The loose fallback still has to find it.
+    #[tokio::test]
+    #[ignore = "makes real network requests"]
+    async fn an_extra_word_falls_back_to_a_looser_search() {
+        let r = Resolver::new("0.1.0-test");
+        let found = r.search_albums("slint and spiderland").await.unwrap();
+        assert!(
+            found.iter().any(|c| c.title.as_deref() == Some("Spiderland")),
+            "{found:#?}"
+        );
     }
 }

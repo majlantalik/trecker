@@ -68,4 +68,55 @@ h1, h2, h3, h4 {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 229, 176, 0.25);
 }
+
+/*
+ * The app's dialog look: the panel surface, a teal left edge, the display font for the
+ * title. Opt in with :pt="{ root: { class: 'tk-dialog' } }".
+ *
+ * Written as PrimeVue's own CSS variables, not as plain declarations. PrimeVue injects its
+ * theme stylesheet at runtime, after this one, so a one-class rule here such as
+ * `background: ...` loses to its `.p-dialog` rule and silently never applies. Its rules
+ * read variables declared on :root, and a variable declared on the dialog itself wins for
+ * the dialog and everything inside it, whatever order the stylesheets load in.
+ */
+.tk-dialog {
+  --p-dialog-background: var(--tk-surface);
+  --p-dialog-border-color: var(--tk-border-hover);
+  --p-dialog-color: var(--tk-text);
+  --p-dialog-border-radius: 14px;
+  --p-dialog-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 3px 0 0 var(--tk-accent);
+  --p-dialog-title-font-size: 1.1rem;
+  --p-dialog-title-font-weight: 700;
+
+  /* Lists inside a dialog sit on the panel rather than on a darker form field. */
+  --p-listbox-background: transparent;
+  --p-listbox-border-color: var(--tk-border);
+  --p-listbox-border-radius: 10px;
+  --p-listbox-color: var(--tk-text);
+  --p-listbox-option-color: var(--tk-text);
+  --p-listbox-option-border-radius: 8px;
+  --p-listbox-option-focus-background: var(--tk-surface-hover);
+  --p-listbox-option-focus-color: var(--tk-text);
+  --p-listbox-option-selected-background: var(--tk-accent-dim);
+  --p-listbox-option-selected-color: var(--tk-accent);
+  --p-listbox-option-selected-focus-background: var(--tk-accent-dim);
+  --p-listbox-option-selected-focus-color: var(--tk-accent);
+}
+
+.tk-dialog .p-dialog-title {
+  font-family: var(--tk-font-display);
+  letter-spacing: -0.02em;
+}
+
+/* Keyboard shortcut hints. Wrapped in :where() so it adds no specificity, and a dialog's
+   own scoped kbd style, such as the shortcuts help's larger keys, still wins. */
+:where(.tk-dialog) kbd {
+  font-family: inherit;
+  font-size: 0.68rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid var(--tk-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 228, 240, 0.7);
+}
 </style>

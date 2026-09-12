@@ -16,17 +16,21 @@ no server, no network required to use it.
 
 Type into the **Quick Add** bar at the top of any page.
 
-- **Artist and album** (`Slint - Spiderland`) — looked up on MusicBrainz. Artist, title,
-  the album's original release year, country and genres come back filled in, with cover
-  art from the Cover Art Archive.
-- **Just an album title** — the same lookup, less precisely.
+- **Artist and album** (`slint spiderland`), or just an album title — searched on
+  MusicBrainz. A dash between artist and album (`Slint - Spiderland`) makes the search
+  stricter, but is not needed.
 - **A Bandcamp or Apple Music link** — the artist and album are read out of the URL and
   searched, and the link is saved.
 - **A Spotify, Tidal or YouTube link** — the link is saved, but nothing is looked up
   through it. See below.
-- **Anything else** — the form opens for manual entry.
 
-A pre-filled form opens either way. Adjust anything, then **Add to Queue**.
+Press <kbd>Enter</kbd> or **Add**. If the search finds one album, the form opens with it
+filled in: artist, title, the album's original year, country, genres and cover. If it finds
+several, up to ten are listed with their covers, type and year. Choose one with the arrow
+keys and <kbd>Enter</kbd>, or click it, and the form opens filled in with that album.
+**None of these** opens the form without a match. So does a search that finds nothing.
+
+Adjust anything in the form, then **Add to Queue**.
 
 Existing releases in your library appear as suggestions while you type, so adding
 something you already have does not create a duplicate.
@@ -182,9 +186,9 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 96 frontend tests
-npm run test:rust  # 124 Rust tests
-npm run test:net   # 9 tests against the live metadata services
+npm test           # 124 frontend tests
+npm run test:rust  # 134 Rust tests
+npm run test:net   # 11 tests against the live metadata services
 ```
 
 The Rust integration tests run against a real temporary SQLite file through the real
@@ -236,11 +240,13 @@ Art Archive are open, and everything else is local.
 
 ### Command surface
 
-Twenty-two Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
+Twenty-four Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
 | Command | Purpose |
 |---|---|
-| `releases_resolve` | Resolve a URL or search query to metadata |
+| `releases_resolve` | Resolve a pasted link to one album's metadata |
+| `releases_search` | Up to ten albums matching typed text, most likely first |
+| `releases_lookup` | Full metadata for the album chosen from a search |
 | `releases_create` | Add a release to the queue |
 | `releases_list` | List with filtering, sorting, pagination |
 | `releases_random` | Pick a random queued release |

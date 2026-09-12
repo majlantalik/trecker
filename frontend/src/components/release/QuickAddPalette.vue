@@ -7,7 +7,7 @@
     :show-header="false"
     :dismissable-mask="true"
     class="quick-add-palette"
-    :pt="{ root: { class: 'qap-root' }, mask: { class: 'qap-mask' } }"
+    :pt="{ root: { class: 'tk-dialog qap-root' }, mask: { class: 'qap-mask' } }"
     @show="onShow"
   >
     <QuickAddBar ref="barRef" palette @added="open = false" />
@@ -59,31 +59,16 @@ async function onShow() {
   opacity: 0.5;
 }
 
-kbd {
-  font-family: inherit;
-  font-size: 0.68rem;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  border: 1px solid var(--tk-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(226, 228, 240, 0.7);
-}
 </style>
 
 <style>
 /* Unscoped: PrimeVue renders the dialog into a teleport outside this component. */
 .qap-root {
   width: min(640px, calc(100vw - 3rem));
-  background: var(--tk-surface);
-  border: 1px solid var(--tk-border-hover);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 3px 0 0 var(--tk-accent);
 }
 
 .qap-root .p-dialog-content {
   padding: 1.1rem 1.25rem 1rem;
-  background: transparent;
-  border-radius: 14px;
 }
 
 /* Sit the palette near the top, where a launcher belongs, rather than dead centre. */

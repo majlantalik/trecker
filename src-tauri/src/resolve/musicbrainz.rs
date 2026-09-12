@@ -22,7 +22,7 @@
 //! album, because that is what one is.
 
 use super::{Resolver, TIMEOUT};
-use crate::domain::ResolvedMetadata;
+use crate::domain::{AlbumCandidate, ResolvedMetadata};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -98,33 +98,65 @@ impl Resolver {
         }
     }
 
-    /// Searches for an album and returns the release group most likely to be it.
+    /// Searches for albums and returns up to `limit` of them, most likely first.
     ///
-    /// `Artist - Title` becomes a two-field Lucene query, anything else a title search.
-    /// Only enough is read to identify the group: the lookup that follows is the
-    /// authority for every field, and this result is the fallback if that lookup fails.
-    pub async fn mb_search_release_group(&self, query: &str) -> Option<ResolvedMetadata> {
-        let lucene = match query.split_once(" - ") {
-            Some((artist, title)) => format!(
-                "artist:\"{}\" AND releasegroup:\"{}\"",
-                escape_lucene(artist.trim()),
-                escape_lucene(title.trim())
-            ),
-            None => format!("releasegroup:\"{}\"", escape_lucene(query.trim())),
+    /// Returns None only when MusicBrainz cannot be reached, so that "nothing found" and
+    /// "could not look" stay distinguishable to the caller.
+    pub async fn mb_search_release_groups(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Option<Vec<AlbumCandidate>> {
+        let Some(precise) = search_query(query) else {
+            return Some(Vec::new());
         };
+        let mut hits = self.release_group_hits(&precise).await?;
 
-        // Several hits, not one: the top-scored hit is often not the album. See
-        // `pick_release_group`.
+        if hits.is_empty() {
+            // The precise query needs every word in the artist or the title, so one extra
+            // word, such as a year or "and", empties it. A plain search is looser and
+            // ranks worse, which is acceptable in a list the person chooses from.
+            if let Some(loose) = loose_query(query) {
+                hits = self.release_group_hits(&loose).await?;
+            }
+        }
+
+        Some(
+            rank_release_groups(&hits)
+                .into_iter()
+                .filter_map(read_candidate)
+                .take(limit)
+                .collect(),
+        )
+    }
+
+    /// The single most likely album, for paths that cannot ask the person to choose, such
+    /// as a pasted Bandcamp link.
+    pub async fn mb_search_release_group(&self, query: &str) -> Option<ResolvedMetadata> {
+        let best = self.mb_search_release_groups(query, 1).await?.into_iter().next()?;
+        (best.artist.is_some() || best.title.is_some()).then(|| ResolvedMetadata {
+            artist: best.artist,
+            title: best.title,
+            release_year: best.release_year,
+            musicbrainz_release_group_id: Some(best.musicbrainz_release_group_id),
+            ..Default::default()
+        })
+    }
+
+    /// One page of raw search hits. More than are shown, because ranking reorders them
+    /// and the album can sit below a few same-named singles and bootlegs.
+    async fn release_group_hits(&self, lucene: &str) -> Option<Vec<Value>> {
         let url = format!(
-            "{API}/release-group?query={}&fmt=json&limit=10",
-            urlencode(&lucene)
+            "{API}/release-group?query={}&fmt=json&limit=25",
+            urlencode(lucene)
         );
         let body = self.mb_get(&url).await?;
-        let hits = body.get("release-groups")?.as_array()?;
-        let group = pick_release_group(hits)?;
-
-        let metadata = read_release_group(group);
-        (metadata.artist.is_some() || metadata.title.is_some()).then_some(metadata)
+        Some(
+            body.get("release-groups")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default(),
+        )
     }
 
     /// Everything Trecker keeps about an album, from its release group, in one request.
@@ -163,7 +195,7 @@ pub(super) fn header_seconds(response: &reqwest::Response) -> Option<Duration> {
         .map(Duration::from_secs)
 }
 
-/// Chooses the album from a page of release-group search hits.
+/// Orders a page of release-group search hits, most likely album first.
 ///
 /// MusicBrainz scores on text alone, so every group whose title matches exactly scores
 /// 100 and their order among themselves means nothing. Live results showed why that
@@ -171,14 +203,14 @@ pub(super) fn header_seconds(response: &reqwest::Response) -> Option<Duration> {
 /// "Metallica - Metallica" ranks a live bootleg, an interview disc and a compilation all
 /// above the 1991 album.
 ///
-/// So among the hits tied for the best score, a plain album beats anything with a
+/// So hits are ordered by score, and among equal scores a plain album beats anything with a
 /// secondary type such as live or compilation, which beats every other type. Within that,
 /// the group with the most releases wins: the canonical album is the one that has been
-/// pressed and reissued, and a bootleg has one release. A search for an EP or a single
-/// still finds it, because the preference only reorders ties and never filters.
-fn pick_release_group(hits: &[Value]) -> Option<&Value> {
+/// pressed and reissued, and a bootleg has one release. MusicBrainz's own order breaks what
+/// remains. A lower score never moves above a higher one, so a search for an EP or a single
+/// still puts it first.
+fn rank_release_groups(hits: &[Value]) -> Vec<&Value> {
     let score = |h: &Value| h.get("score").and_then(Value::as_i64).unwrap_or(0);
-    let best = hits.iter().map(score).max()?;
 
     let rank = |h: &Value| {
         let album = h.get("primary-type").and_then(Value::as_str) == Some("Album");
@@ -195,12 +227,108 @@ fn pick_release_group(hits: &[Value]) -> Option<&Value> {
         (kind, releases)
     };
 
-    // `max_by_key` keeps the last of equal elements; reversing first keeps MusicBrainz's
-    // own order as the final tie-break.
-    hits.iter()
-        .filter(|h| score(h) == best)
-        .rev()
-        .max_by_key(|h| rank(h))
+    let mut ranked: Vec<(usize, &Value)> = hits.iter().enumerate().collect();
+    ranked.sort_by(|(ia, a), (ib, b)| {
+        score(b)
+            .cmp(&score(a))
+            .then_with(|| rank(b).cmp(&rank(a)))
+            .then_with(|| ia.cmp(ib))
+    });
+    ranked.into_iter().map(|(_, h)| h).collect()
+}
+
+/// The first of `rank_release_groups`, which is what the tie-breaking tests are about.
+#[cfg(test)]
+fn pick_release_group(hits: &[Value]) -> Option<&Value> {
+    rank_release_groups(hits).into_iter().next()
+}
+
+/// A search hit as a candidate for the list. None for a hit with no id, which could not be
+/// looked up once chosen.
+fn read_candidate(group: &Value) -> Option<AlbumCandidate> {
+    let basics = read_release_group(group);
+    let id = basics.musicbrainz_release_group_id?;
+    Some(AlbumCandidate {
+        album_art_url: super::coverart::small_cover_url(&id),
+        musicbrainz_release_group_id: id,
+        artist: basics.artist,
+        title: basics.title,
+        release_year: basics.release_year,
+        primary_type: group.get("primary-type").and_then(Value::as_str).map(String::from),
+        secondary_types: group
+            .get("secondary-types")
+            .and_then(Value::as_array)
+            .map(|types| types.iter().filter_map(Value::as_str).map(String::from).collect())
+            .unwrap_or_default(),
+        disambiguation: group
+            .get("disambiguation")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|d| !d.is_empty())
+            .map(String::from),
+    })
+}
+
+/// The search for what was typed. None when there is nothing searchable in it.
+///
+/// `Artist - Title` searches the two fields separately, which is precise and is what the
+/// person asked for by typing the separator. Anything else might be a title alone or an
+/// artist and title run together, and a title search alone found nothing for the second.
+/// So the query scores an exact title highest, and otherwise needs every word to appear in
+/// the artist or the title. Checked live: "avenged sevenfold nightmare", "slint
+/// spiderland" and "ok computer" all put the right album first with ranking applied, where
+/// a plain search ranked the self-titled album and a tribute record above them.
+fn search_query(text: &str) -> Option<String> {
+    if let Some((artist, title)) = split_artist_title(text) {
+        return Some(format!(
+            "artist:\"{}\" AND releasegroup:\"{}\"",
+            escape_lucene(artist),
+            escape_lucene(title)
+        ));
+    }
+
+    let words = searchable_words(text);
+    if words.is_empty() {
+        return None;
+    }
+    let phrase = escape_lucene(&words.join(" "));
+    let each = words
+        .iter()
+        .map(|w| {
+            let w = escape_lucene(w);
+            format!("(artist:\"{w}\" OR releasegroup:\"{w}\")")
+        })
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    Some(format!("releasegroup:\"{phrase}\"^3 OR ({each})"))
+}
+
+/// The fallback when the precise search finds nothing: the words alone, in no field, so
+/// MusicBrainz searches its default fields and any of them may match.
+fn loose_query(text: &str) -> Option<String> {
+    let words: Vec<String> = searchable_words(&text.replace(['–', '—'], " "))
+        .iter()
+        .map(|w| escape_lucene(w))
+        .collect();
+    (!words.is_empty()).then(|| words.join(" "))
+}
+
+/// Hyphen, en dash or em dash with spaces around, since a dash typed on a phone or copied
+/// from a web page is rarely the ASCII one. Both sides must have text.
+fn split_artist_title(text: &str) -> Option<(&str, &str)> {
+    [" - ", " – ", " — "].iter().find_map(|sep| {
+        let (artist, title) = text.split_once(sep)?;
+        let (artist, title) = (artist.trim(), title.trim());
+        (!artist.is_empty() && !title.is_empty()).then_some((artist, title))
+    })
+}
+
+/// Words with at least one letter or digit. A lone dash or ampersand is not something an
+/// artist or title can be required to contain.
+fn searchable_words(text: &str) -> Vec<&str> {
+    text.split_whitespace()
+        .filter(|w| w.chars().any(char::is_alphanumeric))
+        .collect()
 }
 
 /// The fields a search hit and a lookup share.
@@ -395,6 +523,107 @@ mod tests {
 
         let nothing = serde_json::json!({"artist-credit": [{"artist": {"name": "Anon"}}]});
         assert_eq!(artist_country(&nothing), None, "no guess from anywhere else");
+    }
+
+    #[test]
+    fn a_separator_searches_artist_and_title_separately() {
+        assert_eq!(
+            search_query("Avenged Sevenfold - Nightmare").as_deref(),
+            Some(r#"artist:"Avenged Sevenfold" AND releasegroup:"Nightmare""#)
+        );
+    }
+
+    #[test]
+    fn en_and_em_dashes_separate_too() {
+        for text in ["Slint – Spiderland", "Slint — Spiderland"] {
+            assert_eq!(split_artist_title(text), Some(("Slint", "Spiderland")), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_dash_inside_a_name_is_not_a_separator() {
+        // No spaces around it, or nothing on one side.
+        assert_eq!(split_artist_title("Blink-182 Enema of the State"), None);
+        assert_eq!(split_artist_title(" - Spiderland"), None);
+    }
+
+    #[test]
+    fn words_without_a_separator_match_across_artist_and_title() {
+        assert_eq!(
+            search_query("avenged sevenfold nightmare").as_deref(),
+            Some(concat!(
+                r#"releasegroup:"avenged sevenfold nightmare"^3 OR ("#,
+                r#"(artist:"avenged" OR releasegroup:"avenged") AND "#,
+                r#"(artist:"sevenfold" OR releasegroup:"sevenfold") AND "#,
+                r#"(artist:"nightmare" OR releasegroup:"nightmare"))"#
+            ))
+        );
+    }
+
+    #[test]
+    fn query_syntax_in_typed_words_is_escaped() {
+        let q = search_query("AC/DC \"Back\"").unwrap();
+        assert!(q.contains(r#"artist:"AC\/DC""#), "{q}");
+        assert!(q.contains(r#"artist:"\"Back\"""#), "{q}");
+    }
+
+    #[test]
+    fn words_with_no_letters_are_not_required() {
+        // A stray dash would otherwise have to appear in the artist or title, and nothing
+        // ever would match.
+        let q = search_query("duster & stratosphere").unwrap();
+        assert!(!q.contains(r#"artist:"\&""#) && !q.contains(r#"artist:"&""#), "{q}");
+        assert_eq!(search_query("  -  "), None);
+        assert_eq!(search_query(""), None);
+    }
+
+    #[test]
+    fn the_loose_fallback_is_just_the_words() {
+        assert_eq!(loose_query("slint and spiderland").as_deref(), Some("slint and spiderland"));
+        assert_eq!(loose_query("Slint – Spiderland 1991").as_deref(), Some("Slint Spiderland 1991"));
+        assert_eq!(loose_query("–"), None);
+    }
+
+    #[test]
+    fn ranks_every_hit_not_only_the_first() {
+        // Live order for "avenged sevenfold nightmare": the single first.
+        let hits = [
+            hit(100, "single", "Single", &[], 3),
+            hit(100, "album", "Album", &[], 15),
+            hit(74, "soundfont", "Album", &[], 1),
+            hit(74, "drum cover", "Single", &[], 2),
+        ];
+        let order: Vec<&str> = rank_release_groups(&hits)
+            .iter()
+            .map(|h| h["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(order, ["album", "single", "soundfont", "drum-cover"]);
+    }
+
+    #[test]
+    fn reads_a_candidate_for_the_list() {
+        let group = serde_json::json!({
+            "id": "abc", "title": "Metallica", "first-release-date": "1996",
+            "primary-type": "Album", "secondary-types": ["Live"],
+            "disambiguation": "  bootleg  ",
+            "artist-credit": [{"name": "Metallica"}],
+        });
+        let c = read_candidate(&group).unwrap();
+        assert_eq!(c.musicbrainz_release_group_id, "abc");
+        assert_eq!(c.title.as_deref(), Some("Metallica"));
+        assert_eq!(c.release_year, Some(1996));
+        assert_eq!(c.primary_type.as_deref(), Some("Album"));
+        assert_eq!(c.secondary_types, vec!["Live"]);
+        assert_eq!(c.disambiguation.as_deref(), Some("bootleg"));
+        assert_eq!(c.album_art_url, "https://coverartarchive.org/release-group/abc/front-250");
+    }
+
+    #[test]
+    fn a_hit_without_an_id_is_not_a_candidate() {
+        // It could not be looked up once chosen.
+        assert!(read_candidate(&serde_json::json!({"title": "x"})).is_none());
+        let blank = serde_json::json!({"id": "a", "disambiguation": ""});
+        assert_eq!(read_candidate(&blank).unwrap().disambiguation, None);
     }
 
     #[test]

@@ -58,6 +58,29 @@ pub async fn releases_resolve(
     resolver.resolve(request).await
 }
 
+/// Up to ten albums matching what was typed into quick add.
+#[tauri::command]
+pub async fn releases_search(
+    resolver: State<'_, Resolver>,
+    query: String,
+) -> AppResult<Vec<AlbumCandidate>> {
+    resolver.search_albums(&query).await
+}
+
+/// Everything known about the album chosen from a search: genres, country and cover, which
+/// the search results leave out.
+#[tauri::command]
+pub async fn releases_lookup(
+    resolver: State<'_, Resolver>,
+    release_group_id: String,
+) -> AppResult<ResolvedMetadata> {
+    let id = release_group_id.trim();
+    if id.is_empty() {
+        return Err(AppError::Invalid("no album to look up".into()));
+    }
+    resolver.lookup(id).await
+}
+
 #[tauri::command]
 pub async fn releases_refresh_metadata(
     db: State<'_, Db>,

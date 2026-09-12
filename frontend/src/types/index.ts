@@ -62,6 +62,18 @@ export interface ResolvedMetadata {
   musicbrainzReleaseGroupId?: string
 }
 
+/** One possible match from a quick add search. Genres, country and cover come later. */
+export interface AlbumCandidate {
+  musicbrainzReleaseGroupId: string
+  artist: string | null
+  title: string | null
+  releaseYear: number | null
+  primaryType: string | null
+  secondaryTypes: string[]
+  disambiguation: string | null
+  albumArtUrl: string
+}
+
 export interface PageResponse<T> {
   content: T[]
   totalElements: number

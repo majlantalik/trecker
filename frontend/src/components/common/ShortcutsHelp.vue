@@ -5,7 +5,7 @@
     header="Keyboard shortcuts"
     :draggable="false"
     class="shortcuts-help"
-    :pt="{ root: { class: 'sch-root' } }"
+    :pt="{ root: { class: 'tk-dialog sch-root' } }"
   >
     <div v-for="group in SHORTCUT_GROUPS" :key="group" class="sch-group">
       <h3 class="sch-group-title">{{ group }}</h3>
@@ -112,15 +112,6 @@ kbd {
 /* Unscoped: PrimeVue teleports the dialog outside this component. */
 .sch-root {
   width: min(460px, calc(100vw - 3rem));
-  background: var(--tk-surface);
-  border: 1px solid var(--tk-border);
-  border-radius: 14px;
-  box-shadow: inset 3px 0 0 var(--tk-accent);
-}
-
-.sch-root .p-dialog-header,
-.sch-root .p-dialog-content {
-  background: transparent;
 }
 
 .sch-root .p-dialog-header {
@@ -129,6 +120,5 @@ kbd {
 
 .sch-root .p-dialog-content {
   padding: 0.5rem 1.25rem 1.25rem;
-  border-radius: 0 0 14px 14px;
 }
 </style>

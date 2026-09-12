@@ -46,14 +46,23 @@
       v-if="!palette"
       label="Add"
       icon="pi pi-search"
-      :loading="resolving"
+      :loading="busy"
       :disabled="!inputValue.trim()"
       @click="handleAdd"
     />
 
+    <AlbumPicker
+      v-model:visible="pickerVisible"
+      :candidates="candidates"
+      :query="query"
+      :choosing-id="choosingId"
+      @choose="choose"
+      @none="chooseNone"
+    />
+
     <ReleaseForm
-      v-model:visible="showForm"
-      :prefill="resolvedMetadata"
+      v-model:visible="formVisible"
+      :prefill="prefill"
       @submit="handleFormSubmit"
     />
   </div>
@@ -61,11 +70,13 @@
 
 <script setup lang="ts">
 import { coverSrc } from '@/api/cache'
-import { ref, watch, onUnmounted } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
 import ReleaseForm from './ReleaseForm.vue'
+import AlbumPicker from './AlbumPicker.vue'
+import { useAlbumSearch } from '@/composables/useAlbumSearch'
 import { releasesApi } from '@/api/releases'
 import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
@@ -84,9 +95,24 @@ const emit = defineEmits<{ added: []; resolving: [value: boolean] }>()
 const acValue = ref<string | ResolvedMetadata>('')
 const inputValue = ref('')
 const suggestions = ref<ResolvedMetadata[]>([])
-const resolving = ref(false)
-const showForm = ref(false)
-const resolvedMetadata = ref<ResolvedMetadata | null>(null)
+// Pasted links still resolve to a single album: a link names one release, and the
+// streaming services it comes from cannot be searched anyway.
+const resolvingLink = ref(false)
+const {
+  query,
+  searching,
+  candidates,
+  pickerVisible,
+  choosingId,
+  prefill,
+  formVisible,
+  error: searchError,
+  search,
+  choose,
+  chooseNone,
+  openForm
+} = useAlbumSearch()
+const busy = computed(() => resolvingLink.value || searching.value || !!choosingId.value)
 const toast = useToast()
 const releasesStore = useReleasesStore()
 const genresStore = useGenresStore()
@@ -119,12 +145,11 @@ async function fetchSuggestions(event: { query: string }) {
 }
 
 function handleCatalogSelect(event: { value: ResolvedMetadata }) {
-  resolvedMetadata.value = event.value
   const label = `${event.value.artist} – ${event.value.title}`
   acValue.value = label
   inputValue.value = label
   suggestions.value = []
-  showForm.value = true
+  openForm(event.value)
 }
 
 function clearInput() {
@@ -139,7 +164,7 @@ async function handlePaste(event: ClipboardEvent) {
     event.preventDefault()
     acValue.value = text
     inputValue.value = text
-    await resolve(text, true)
+    await resolveLink(text)
   }
 }
 
@@ -149,42 +174,38 @@ async function handleEnter() {
 
 async function handleAdd() {
   const val = inputValue.value.trim()
-  if (!val) return
-  await resolve(val, URL_PATTERN.test(val))
-}
+  if (!val || busy.value) return
+  if (URL_PATTERN.test(val)) {
+    await resolveLink(val)
+    return
+  }
 
-function parseQueryText(input: string): ResolvedMetadata | null {
-  const sep = input.indexOf(' - ')
-  if (sep === -1) return null
-  return {
-    artist: input.slice(0, sep).trim(),
-    title: input.slice(sep + 3).trim(),
-    releaseYear: null,
-    albumArtUrl: null,
-    country: null,
-    streamingLinks: {},
-    genres: []
+  const outcome = await search(val)
+  if (outcome === 'none') {
+    toast.add({
+      severity: 'info',
+      summary: 'Nothing found on MusicBrainz',
+      detail: 'Fill in the details yourself.',
+      life: 3500
+    })
+  } else if (outcome === 'failed') {
+    toast.add({
+      severity: 'warn',
+      summary: 'Could not search MusicBrainz',
+      detail: searchError.value,
+      life: 4000
+    })
   }
 }
 
-async function resolve(value: string, isUrl: boolean) {
-  resolving.value = true
-  resolvedMetadata.value = null
+async function resolveLink(url: string) {
+  resolvingLink.value = true
   try {
-    const request = isUrl ? { url: value } : { query: value }
-    const metadata = await releasesApi.resolve(request)
-    // If resolve succeeded but returned no identity for a plain query, fall back to parsed text
-    if (!isUrl && metadata && !metadata.artist && !metadata.title) {
-      resolvedMetadata.value = parseQueryText(value) ?? metadata
-    } else {
-      resolvedMetadata.value = metadata
-    }
-  } catch (e) {
-    // All resolvers failed — pre-fill from typed text as last resort
-    resolvedMetadata.value = isUrl ? null : parseQueryText(value)
+    openForm(await releasesApi.resolve({ url }))
+  } catch {
+    openForm(null)
   } finally {
-    resolving.value = false
-    showForm.value = true
+    resolvingLink.value = false
   }
 }
 
@@ -201,7 +222,7 @@ async function handleFormSubmit(data: any) {
       life: 3000
     })
     clearInput()
-    resolvedMetadata.value = null
+    prefill.value = null
     emit('added')
   } catch (e: any) {
     toast.add({

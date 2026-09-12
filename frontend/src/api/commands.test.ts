@@ -27,6 +27,19 @@ describe('releases commands', () => {
     })
   })
 
+  it('search sends the typed text as "query"', async () => {
+    await releasesApi.search('avenged sevenfold nightmare')
+    expect(invoke).toHaveBeenCalledWith('releases_search', { query: 'avenged sevenfold nightmare' })
+  })
+
+  it('lookup sends the id as "releaseGroupId"', async () => {
+    // Tauri maps the camelCase key onto the Rust argument `release_group_id`.
+    await releasesApi.lookup('180560ee-2d9d-33cf-8de7-cdaaba610739')
+    expect(invoke).toHaveBeenCalledWith('releases_lookup', {
+      releaseGroupId: '180560ee-2d9d-33cf-8de7-cdaaba610739'
+    })
+  })
+
   it('create passes the request through', async () => {
     await releasesApi.create({ artist: 'Duster', title: 'Stratosphere' })
     expect(invoke).toHaveBeenCalledWith('releases_create', {

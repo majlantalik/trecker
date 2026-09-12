@@ -23,7 +23,7 @@ npm run build:fast     # debug .deb, for when you need something installable now
 npm run build:nobundle # binary only
 npm test               # frontend tests
 npm run test:rust      # Rust tests
-npm run test:net       # the nine network tests, excluded from test:rust
+npm run test:net       # the eleven network tests, excluded from test:rust
 ```
 
 ### Build times
@@ -57,11 +57,11 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-124 Rust tests and 96 frontend tests. The Rust integration tests in
+134 Rust tests and 124 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
-Nine further tests hit the live MusicBrainz and Cover Art Archive services and are
+Eleven further tests hit the live MusicBrainz and Cover Art Archive services and are
 excluded from normal runs. `npm run test:net` runs them, and passes `--test-threads=1`,
 which is required: the MusicBrainz rate limiter lives on the `Resolver`, each test builds
 its own, and parallel runs trip the limit and get a 503.
@@ -76,7 +76,7 @@ frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api
 src-tauri/    The Rust core.
   migrations/ sqlx migrations, replacing Liquibase
   src/
-    commands.rs   the #[tauri::command] surface, 22 commands
+    commands.rs   the #[tauri::command] surface, 24 commands
     covers.rs     the on-disk cover cache and the cover: protocol
     db.rs         pool, pragmas, migration runner, DbInfo diagnostics
     domain.rs     wire types, mirroring frontend/src/types/index.ts
@@ -120,8 +120,22 @@ The `id` in every API response is the **catalog release id**, not the tracking r
 
 ### Metadata resolution
 
-`releases_resolve` → `resolve/mod.rs` → MusicBrainz for identity and genres, Cover Art
-Archive for artwork, both best-effort.
+Typed text goes through `releases_search`, which returns up to ten candidates from one
+search request, and then `releases_lookup` for the one chosen, which adds genres, country
+and cover. A pasted link goes through `releases_resolve`, which picks one album itself.
+MusicBrainz supplies identity and genres, the Cover Art Archive the artwork, both
+best-effort.
+
+**Search results stay thin.** Genres, country and the real cover each need a lookup, and at
+one MusicBrainz request per second a list of ten would take ten seconds. Only the chosen
+album is looked up. The list's covers come from an archive address that needs no request
+and often 404s, so `prefillFromCandidate` never saves it.
+
+**How typed text is searched** is in `search_query`. A spaced dash searches artist and title
+separately. Anything else scores an exact title highest and otherwise requires every word
+in the artist or the title. When that finds nothing, typically because of an extra word
+such as a year, `loose_query` retries with the words alone. Change these only against live
+results; `npm run test:net` covers the cases that shaped them.
 
 **Spotify, Tidal and YouTube are link-only.** Do not add lookups through them or any
 credential for them. A pasted streaming URL is saved as a link with sharing parameters
@@ -134,7 +148,7 @@ The rules that follow:
 
 - **Country is the credited artist's,** then their area name, then nothing. Never fall
   back to a pressing's country.
-- **`pick_release_group` only reorders hits tied on score.** Never filter by type, or EPs
+- **`rank_release_groups` only reorders hits tied on score.** Never filter by type, or EPs
   and singles become unfindable.
 - **Refresh looks the stored group id up directly.** Only a release with no id is refreshed
   by searching its artist and title.
@@ -260,6 +274,18 @@ party on every launch.
 **Queries use runtime `sqlx::query()`, not the `query!` macros.** The macros need a live
 database or a checked-in `.sqlx` cache at build time, and cannot check the filter queries,
 which are assembled at runtime. The integration tests catch a wrong column name instead.
+
+**Restyle PrimeVue through its CSS variables, not plain declarations.** PrimeVue injects its
+theme at runtime, after the app's stylesheet, so a one-class rule such as
+`.my-dialog { background: ... }` loses to `.p-dialog` and never applies, with no error. Set
+the variable the theme reads instead, such as `--p-dialog-background`, on the component's
+root; `.tk-dialog` in `App.vue` does this for dialogs, so give new dialogs that class. The
+name of any token's variable comes from `dt()` in `@primeuix/styled`, and the tokens are
+listed in `@primeuix/themes/dist/aura/<component>`.
+
+**A dialog focuses its content's `[autofocus]` element when it finishes opening, or else its
+close button.** Focusing something yourself in `@show` is overridden a moment later. Mark the
+element instead; `AlbumPicker` passes `autofocus` to its list through `pt`.
 
 **`primeicons` is a separate package** and must stay listed in `package.json`.
 

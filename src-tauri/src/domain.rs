@@ -90,6 +90,30 @@ pub struct ResolvedMetadata {
     pub musicbrainz_release_group_id: Option<String>,
 }
 
+/// One possible match for a quick add search, shown in a list to choose from.
+///
+/// Deliberately thin: everything here comes from a single search request. Genres, country
+/// and the chosen cover need a lookup each, which at one MusicBrainz request per second
+/// would make a list of ten take ten seconds, so they are fetched only for the album the
+/// person picks.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumCandidate {
+    pub musicbrainz_release_group_id: String,
+    pub artist: Option<String>,
+    pub title: Option<String>,
+    pub release_year: Option<i32>,
+    /// `Album`, `EP`, `Single`, `Broadcast` or `Other`, as MusicBrainz names them.
+    pub primary_type: Option<String>,
+    /// Such as `Live`, `Compilation` or `Remix`. Empty for a plain studio release.
+    pub secondary_types: Vec<String>,
+    /// MusicBrainz's own note telling same-named albums apart, when it has one.
+    pub disambiguation: Option<String>,
+    /// A small cover for the list. Not checked: many albums have none, and the image
+    /// simply fails to load.
+    pub album_art_url: String,
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseFilterParams {

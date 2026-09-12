@@ -8,6 +8,16 @@ use super::{Resolver, TIMEOUT};
 use serde_json::Value;
 use std::time::Duration;
 
+/// A small front cover for an album, by address alone.
+///
+/// The archive redirects this to the 250px front image of the pressing that represents
+/// the album, or answers 404 when there is none. It needs no request to build, which is
+/// what makes a cover per search result affordable. The cover cache fetches it when the
+/// list is shown.
+pub fn small_cover_url(release_group_id: &str) -> String {
+    format!("https://coverartarchive.org/release-group/{release_group_id}/front-250")
+}
+
 impl Resolver {
     /// The album's cover.
     ///
