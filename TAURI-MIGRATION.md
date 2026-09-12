@@ -106,15 +106,15 @@ Good news from a pre-scan of the frontend: no `:has()`, no `@container`, no `col
 The only risky properties are `backdrop-filter` in `AppLayout.vue:41` (already
 `-webkit-` prefixed) and `position: sticky` in two places. Risk is lower than feared.
 
-- [ ] `cargo install create-tauri-app`, scaffold `src-tauri/` against existing `frontend/`
-- [ ] `tauri.conf.json`: `devUrl` = `http://localhost:5173`, `frontendDist` = `../frontend/dist`,
+- [x] `cargo install create-tauri-app`, scaffold `src-tauri/` against existing `frontend/`
+- [x] `tauri.conf.json`: `devUrl` = `http://localhost:5173`, `frontendDist` = `../frontend/dist`,
       `beforeDevCommand` = `npm --prefix ../frontend run dev`
-- [ ] One throwaway command returning a hardcoded `Release`, rendered by `ReleaseCard.vue`
-- [ ] Build and run on Linux. Verify in order:
+- [x] One throwaway command returning a hardcoded `Release`, rendered by `ReleaseCard.vue`
+- [x] Build and run on Linux. Verify in order:
       PrimeVue Aura renders; the teal accent palette and gradients are correct;
       `backdrop-filter` on the sticky header; Chart.js canvas at correct DPI;
       custom scrollbar styling; fonts load
-- [ ] Screenshot side by side against the browser build
+- [x] Screenshot side by side against the browser build
 
 **Exit criterion:** the Linux build is visually acceptable. If it is not, stop and
 reconsider Compose Multiplatform before writing any Rust.
@@ -170,7 +170,7 @@ app falls back to system fonts when offline, Tauri's CSP has to be opened up to 
 and a local-first app should not phone a third party on every launch. Fix by vendoring
 the two families via `@fontsource/syne` and `@fontsource/outfit` and importing them in
 `main.ts`. Do this in Phase 0 so the spike measures the real thing.
-- [ ] Vendor Syne and Outfit, drop the `<link>` tags from `index.html`
+- [x] Vendor Syne and Outfit, drop the `<link>` tags from `index.html`
 
 **`index.html` references `/favicon.svg`, which does not exist.** There is no `public/`
 directory. Harmless in the browser, but it should be replaced by the generated icon.
@@ -179,7 +179,7 @@ directory. Harmless in the browser, but it should be replaced by the generated i
 spike. Tighten it in Phase 5, once the resolver hosts are known.
 
 Also do now, independent of the spike:
-- [ ] Check the Spotify developer dashboard for grandfathered user count and client ID count
+- [x] Moot: Spotify was dropped entirely in Phase 4, so grandfathering does not matter.
 
 ---
 
@@ -626,7 +626,7 @@ Conflict model, which the existing data model already gives us for free:
   definition and cannot conflict.
 - Only `user_releases` needs resolution, and it is one writer per device.
   Last-write-wins per field on an `updated_at` column covers it.
-- [ ] Add `updated_at` to `user_releases` in Phase 2 so this is available later at no cost
+- [x] Add `updated_at` to `user_releases` in Phase 2 so this is available later at no cost
 
 ---
 
@@ -657,4 +657,6 @@ had described the Spring Boot web app, which no longer exists on this branch.
 
 ## Open decisions
 
-None outstanding. Next up is Phase 5.
+1. **Merge this branch.** Nineteen commits and 127 files sit on `worktree-tauri-migration`
+   while `main` still holds the Spring Boot web app. Everything from Phase 0 to the
+   keyboard shortcuts is here and nowhere else.
