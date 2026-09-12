@@ -12,14 +12,19 @@
       <div v-for="(s, i) in byGroup(group)" :key="i" class="sch-row">
         <span class="sch-description">{{ s.description }}</span>
         <span class="sch-keys">
-          <kbd v-for="(k, ki) in s.keys" :key="ki">{{ displayKey(k) }}</kbd>
+          <template v-for="(k, ki) in s.keys" :key="ki">
+            <!-- "then" makes the difference between pressing keys together and in turn. -->
+            <span v-if="s.sequence && ki > 0" class="sch-then">then</span>
+            <kbd>{{ displayKey(k) }}</kbd>
+          </template>
         </span>
       </div>
     </div>
 
     <p class="sch-note">
       Shortcuts are ignored while you are typing, apart from the two that open quick add
-      and the one that closes a dialog.
+      and the one that closes a dialog. Sequences expire after a moment if you stop
+      halfway.
     </p>
   </Dialog>
 </template>
@@ -71,8 +76,14 @@ function byGroup(group: string) {
 
 .sch-keys {
   display: inline-flex;
+  align-items: center;
   gap: 0.3rem;
   flex-shrink: 0;
+}
+
+.sch-then {
+  font-size: 0.68rem;
+  color: rgba(226, 228, 240, 0.35);
 }
 
 kbd {

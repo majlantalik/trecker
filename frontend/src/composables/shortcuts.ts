@@ -11,6 +11,8 @@ export interface Shortcut {
   keys: string[]
   description: string
   group: string
+  /** Pressed one after the other rather than together, so the help reads "G then L". */
+  sequence?: boolean
 }
 
 export const SHORTCUTS: Shortcut[] = [
@@ -30,6 +32,30 @@ export const SHORTCUTS: Shortcut[] = [
     group: 'Adding'
   },
   {
+    keys: ['G', 'Q'],
+    description: 'Go to Queue',
+    group: 'Navigation',
+    sequence: true
+  },
+  {
+    keys: ['G', 'L'],
+    description: 'Go to Library',
+    group: 'Navigation',
+    sequence: true
+  },
+  {
+    keys: ['G', 'S'],
+    description: 'Go to Stats',
+    group: 'Navigation',
+    sequence: true
+  },
+  {
+    keys: ['G', 'I'],
+    description: 'Go to Info',
+    group: 'Navigation',
+    sequence: true
+  },
+  {
     keys: ['?'],
     description: 'Show this list',
     group: 'General'
@@ -42,7 +68,7 @@ export const SHORTCUTS: Shortcut[] = [
 ]
 
 /** Groups, in the order they should be shown. */
-export const SHORTCUT_GROUPS = ['Adding', 'General']
+export const SHORTCUT_GROUPS = ['Adding', 'Navigation', 'General']
 
 const isMac =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent)

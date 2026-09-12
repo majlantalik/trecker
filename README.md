@@ -70,6 +70,9 @@ Press <kbd>?</kbd> for the list. <kbd>Shift</kbd> <kbd>Shift</kbd> opens quick a
 anywhere, in the style of a JetBrains IDE; <kbd>Ctrl</kbd>+<kbd>K</kbd> does the same for
 anyone who reaches for that first.
 
+Navigation follows Gmail: <kbd>G</kbd> then the first letter of where you are going, so
+<kbd>G</kbd> <kbd>L</kbd> for Library. A hint appears while the sequence is half-entered.
+
 ### Refreshing metadata
 
 Metadata is fetched once when you add a release. If it came back wrong or incomplete, the
