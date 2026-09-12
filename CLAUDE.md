@@ -33,14 +33,18 @@ Measured on 24 cores, one-line Rust change, warm cache:
 |---|---|
 | `npm run dev` rebuild | 5.5 s |
 | `npm run build:fast` | 21 s |
-| `npm run build` | 74 s |
+| `npm run build` | 67 s |
 
 **Do not reach for `npm run build` while iterating.** The release profile uses fat LTO in
 a single codegen unit, which optimises the whole binary at once and so leaves 23 of 24
-cores idle. That is deliberate: it halves the binary, 4.2 MB against 8.2 MB for thin LTO,
-and release builds happen once per release. `npm run dev` is the loop.
+cores idle. That is deliberate: 7.7 MB against 10.0 MB for thin LTO across 16 units, and
+release builds happen once per release. `npm run dev` is the loop.
 
-If 74 s ever becomes the bottleneck, a faster linker (`mold`) is the next lever; none is
+That saving used to be 4.2 MB against 8.2 MB. `tauri-plugin-dialog` added 3.5 MB of
+already-compact code, so fat LTO now buys 23% rather than half. It is still the right
+default and it is no longer the reason the binary is small.
+
+If 67 s ever becomes the bottleneck, a faster linker (`mold`) is the next lever; none is
 installed.
 
 **Linux needs the webview headers** before anything will compile:
@@ -56,7 +60,7 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-48 Rust tests and 73 frontend tests. The Rust integration tests in
+100 Rust tests and 84 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
@@ -75,10 +79,11 @@ frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api
 src-tauri/    The Rust core.
   migrations/ sqlx migrations, replacing Liquibase
   src/
-    commands.rs   the #[tauri::command] surface, 17 commands
+    commands.rs   the #[tauri::command] surface, 19 commands
     db.rs         pool, pragmas, migration runner, DbInfo diagnostics
     domain.rs     wire types, mirroring frontend/src/types/index.ts
     error.rs      AppError, serialized to the frontend as { code, message }
+    library/      the export and import file format; no SQL, no Tauri
     repo/         sqlx queries; filter.rs is the UserReleaseSpecification port
     resolve/      MusicBrainz + Cover Art Archive
 backend/      FROZEN. Spring Boot, kept only for a future sync server.
@@ -126,6 +131,31 @@ and which one is close to arbitrary: its year is that edition's, its country is 
 that edition was sold, and it often has no cover art even when the album does. The release
 *group* is the album, and `mb_release_details` fetches it in the same request that gets
 genres and the artist's country. All three of those were live bugs.
+
+### Export and import
+
+**The format is specified in [docs/export-format.md](docs/export-format.md).** It was
+written before either side existed, and it is the authority: where the document and
+`src-tauri/src/library/` disagree, the code is wrong.
+
+`library/` decides what the bytes mean and touches neither SQL nor Tauri, so every decision
+about the format is testable without a database. `repo::releases::import_one` does the
+writing. The UI is one section of the Info view, driven by `useLibraryTransfer`.
+
+**A file carries no local row ids.** Identity on the way back in is the MusicBrainz id,
+then artist and title case-insensitively. The second rule is a heuristic that can be wrong,
+which is why it lives in import, where the report makes the result visible, and not in
+`create()`.
+
+**Validation makes the database's constraints unreachable.** Status, rating range and the
+timestamp shapes are all checked before any SQL runs, so a bad row becomes a reported
+rejection rather than a SQL error. Keep it that way: the import loop's error arm exists for
+surprises, not as the normal path.
+
+**Native file dialogs come from `tauri-plugin-dialog`.** It is the only plugin in the
+build, and it costs 3.5 MB: the binary went from 4.2 MB to 7.7 MB when it was added, which
+is most of what fat LTO buys back. Rust writes and reads the file itself given a path, so
+no filesystem permission is granted to the webview.
 
 **`releases_refresh_metadata` is the repair path.** Metadata is written once at add time
 and never revisited, so any improvement here only helps new additions until a user hits
@@ -182,6 +212,10 @@ discover. A test asserts every entry lands in a group the dialog shows.
 this machine, so shortcuts cannot be verified that way. `press-key` reports success and
 nothing happens, for modifier and function keys alike. Cover the logic with unit tests and
 have a human press the keys.
+
+**`@/api/` is the only place that imports Tauri.** `dialog.ts` wraps the file pickers for
+the same reason the others wrap `invoke`: the views and stores stay ordinary Vue and the
+seam stays one directory wide.
 
 **`primeicons` is a separate package** and must stay listed in `package.json`.
 

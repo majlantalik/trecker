@@ -6,6 +6,7 @@
 use crate::db::{Db, DbInfo};
 use crate::domain::*;
 use crate::error::{AppError, AppResult};
+use crate::library;
 use crate::repo;
 use crate::resolve::Resolver;
 use tauri::State;
@@ -174,4 +175,125 @@ fn current_year() -> i32 {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     repo::now_year(secs)
+}
+
+// ---------------------------------------------------------------- export and import
+
+/// What an export wrote, so the interface can say so without reading the file back.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportSummary {
+    pub path: String,
+    pub format: library::Format,
+    pub release_count: usize,
+    pub bytes: usize,
+}
+
+/// Writes the whole library to a path the user has already chosen in a save dialog.
+///
+/// Rust writes the file rather than handing the text back for the frontend to save. That
+/// keeps the filesystem permission to exactly this one command and means the format never
+/// has to survive a trip through the webview.
+#[tauri::command]
+pub async fn library_export(
+    db: State<'_, Db>,
+    app: tauri::AppHandle,
+    path: String,
+    format: library::Format,
+) -> AppResult<ExportSummary> {
+    let (path, format) = library::export_path(&path, format);
+    let version = app.package_info().version.to_string();
+    let releases = collect_export(&db.pool).await?;
+    let text = library::render(&releases, format, &version, &repo::now())?;
+
+    std::fs::write(&path, text.as_bytes())
+        .map_err(|e| AppError::Internal(format!("could not write {path}: {e}")))?;
+
+    Ok(ExportSummary {
+        path,
+        format,
+        release_count: releases.len(),
+        bytes: text.len(),
+    })
+}
+
+/// Reads every tracked release into the file format's shape.
+pub async fn collect_export(pool: &sqlx::SqlitePool) -> AppResult<Vec<library::ExportedRelease>> {
+    Ok(repo::releases::export_all(pool)
+        .await?
+        .into_iter()
+        .map(|row| {
+            let r = row.release;
+            library::ExportedRelease {
+                artist: r.artist,
+                title: r.title,
+                release_year: r.release_year,
+                country: r.country,
+                album_art_url: r.album_art_url,
+                musicbrainz_id: row.musicbrainz_id,
+                genres: r.genres,
+                streaming_links: r.streaming_links.into_iter().collect(),
+                status: crate::repo::filter::status_str(r.status).to_string(),
+                rating: r.rating,
+                did_not_finish: r.did_not_finish,
+                date_listened: r.date_listened,
+                notes: r.notes,
+                discovery_link: r.discovery_link,
+                added_at: Some(r.created_at),
+            }
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn library_import(
+    db: State<'_, Db>,
+    path: String,
+    mode: Option<library::ImportMode>,
+) -> AppResult<library::ImportReport> {
+    let text = std::fs::read_to_string(&path).map_err(|e| {
+        AppError::Invalid(match e.kind() {
+            std::io::ErrorKind::InvalidData => format!("{path} is not a UTF-8 text file"),
+            _ => format!("could not read {path}: {e}"),
+        })
+    })?;
+
+    import_library(&db.pool, &path, &text, mode.unwrap_or_default()).await
+}
+
+/// The body of `library_import`, free of Tauri state and the filesystem so it can be
+/// tested against a temporary database.
+pub async fn import_library(
+    pool: &sqlx::SqlitePool,
+    path: &str,
+    text: &str,
+    mode: library::ImportMode,
+) -> AppResult<library::ImportReport> {
+    let parsed = library::parse(text, library::detect(path, text))?;
+
+    let mut report = library::ImportReport {
+        rejected: parsed.rejected,
+        ..Default::default()
+    };
+
+    for (row, release) in parsed.releases {
+        // One release at a time, each in its own transaction. A row the database refuses
+        // joins the rejected list instead of abandoning the rows after it: a partial
+        // import that says what it did beats an all-or-nothing one that says why it did
+        // nothing.
+        match repo::releases::import_one(pool, &release, mode).await {
+            Ok(repo::releases::ImportOutcome::Added) => report.added += 1,
+            Ok(repo::releases::ImportOutcome::Overwritten) => report.overwritten += 1,
+            Ok(repo::releases::ImportOutcome::Skipped) => report.skipped += 1,
+            Err(e) => report.rejected.push(library::RejectedRow {
+                row,
+                artist: release.artist.clone(),
+                title: release.title.clone(),
+                reason: e.to_string(),
+            }),
+        }
+    }
+
+    report.rejected.sort_by_key(|r| r.row);
+    Ok(report)
 }

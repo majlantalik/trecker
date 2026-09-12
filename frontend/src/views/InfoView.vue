@@ -107,6 +107,57 @@
 
     <div class="info-section">
       <div class="section-header">
+        <i class="pi pi-download section-icon" />
+        <h2 class="section-title">Backup</h2>
+      </div>
+      <div class="section-body">
+        <div class="transfer-row">
+          <span class="stat-label">Export your library</span>
+          <span class="transfer-buttons">
+            <Button label="JSON" icon="pi pi-file" size="small" outlined
+                    :disabled="transfer.busy.value" @click="transfer.exportLibrary('json')" />
+            <Button label="CSV" icon="pi pi-table" size="small" outlined
+                    :disabled="transfer.busy.value" @click="transfer.exportLibrary('csv')" />
+          </span>
+        </div>
+        <p class="form-hint">
+          JSON is the complete record and the one to keep. CSV holds the same releases in a
+          shape a spreadsheet can read. Neither carries the album artwork itself, only the
+          address it lives at.
+        </p>
+
+        <div class="transfer-row transfer-import">
+          <span class="stat-label">Import a file</span>
+          <span class="transfer-buttons">
+            <Select v-model="mode" :options="MODES" option-label="label" option-value="value"
+                    size="small" class="transfer-mode" />
+            <Button label="Choose file" icon="pi pi-upload" size="small" outlined
+                    :disabled="transfer.busy.value" @click="transfer.importLibrary(mode)" />
+          </span>
+        </div>
+        <p class="form-hint">
+          Releases are matched by their MusicBrainz id, then by artist and title. Importing
+          the same file twice changes nothing the second time.
+        </p>
+
+        <p v-if="transfer.error.value" class="db-error">{{ transfer.error.value }}</p>
+        <p v-else-if="transfer.message.value" class="transfer-result">
+          <i class="pi pi-check-circle" />
+          {{ transfer.message.value }}
+        </p>
+
+        <div v-if="transfer.report.value?.rejected.length" class="rejected">
+          <p class="rejected-title">Rows that could not be imported</p>
+          <p v-for="row in transfer.report.value.rejected" :key="row.row" class="rejected-row">
+            <span class="rejected-name">{{ row.artist }} &mdash; {{ row.title || 'untitled' }}</span>
+            <span class="rejected-reason">{{ row.reason }}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <div class="section-header">
         <i class="pi pi-info-circle section-icon" />
         <h2 class="section-title">About</h2>
       </div>
@@ -123,9 +174,22 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import Tag from 'primevue/tag'
+import Button from 'primevue/button'
+import Select from 'primevue/select'
 import { releasesApi } from '@/api/releases'
 import { infoApi } from '@/api/info'
-import type { DbInfo } from '@/types'
+import { useLibraryTransfer } from '@/composables/useLibraryTransfer'
+import type { DbInfo, ImportMode } from '@/types'
+
+const transfer = useLibraryTransfer()
+
+// Named for what happens to a release already in your library, because that is the only
+// thing the choice changes. There is no merge: see docs/export-format.md.
+const MODES = [
+  { label: 'Keep mine', value: 'skip' },
+  { label: 'Replace mine', value: 'overwrite' }
+]
+const mode = ref<ImportMode>('skip')
 
 const version = '0.1.0'
 
@@ -302,6 +366,73 @@ onMounted(async () => {
   direction: rtl;
   text-align: right;
   min-width: 0;
+}
+
+.transfer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.transfer-import {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--tk-border);
+}
+
+.transfer-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.transfer-mode {
+  min-width: 9rem;
+}
+
+.transfer-result {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--tk-accent);
+}
+
+.rejected {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
+.rejected-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f43f5e;
+}
+
+.rejected-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.2rem 0;
+  font-size: 0.8rem;
+}
+
+.rejected-name {
+  color: var(--tk-text);
+}
+
+.rejected-reason {
+  color: rgba(226, 228, 240, 0.55);
+  text-align: right;
 }
 
 .db-error {

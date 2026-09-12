@@ -536,3 +536,248 @@ async fn data_survives_reopening_the_database() {
     assert_eq!(page.content[0].id, created.id);
     assert_eq!(page.content[0].title, "Spiderland");
 }
+
+// ---------------------------------------------------------------- export and import
+
+use crate::commands::{collect_export, import_library};
+use crate::library::{self, ImportMode};
+
+/// Exports the whole library and reads it straight back into a second, empty one.
+///
+/// The point of the format is that the file survives the trip to another machine, and a
+/// second temporary database is the closest thing to one a test can have.
+async fn round_trip(pool: &SqlitePool, format: library::Format) -> (tempfile::TempDir, SqlitePool) {
+    let rows = collect_export(pool).await.unwrap();
+    let text = library::render(&rows, format, "0.1.0", "2026-09-12T09:20:00Z").unwrap();
+    let (dir, other) = fresh().await;
+    let report = import_library(&other, &format!("lib.{}", format.extension()), &text, ImportMode::Skip)
+        .await
+        .unwrap();
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+    assert_eq!(report.added, rows.len());
+    (dir, other)
+}
+
+#[tokio::test]
+async fn a_library_survives_a_json_round_trip() {
+    let (_d, pool) = fresh().await;
+    let id = add_listened(&pool, "Slint", "Spiderland", 4.5, "1991-03-27T00:00:00Z", Some("US"),
+                          &["alternative rock", "rock"]).await;
+    releases::update(&pool, &id, ReleaseUpdateRequest {
+        notes: Some("Needs a full sitting.".into()),
+        did_not_finish: Some(true),
+        discovery_link: Some("https://example.test/tip".into()),
+        streaming_links: Some(HashMap::from([("spotify".into(), "https://open.spotify.com/album/x".into())])),
+        ..Default::default()
+    }).await.unwrap();
+    let before = releases::get(&pool, &id).await.unwrap();
+
+    let (_d2, other) = round_trip(&pool, library::Format::Json).await;
+    let after = releases::list(&other, &ReleaseFilterParams::default()).await.unwrap();
+    assert_eq!(after.total_elements, 1);
+    let r = &after.content[0];
+
+    assert_eq!(r.artist, before.artist);
+    assert_eq!(r.title, before.title);
+    assert_eq!(r.release_year, before.release_year);
+    assert_eq!(r.country, before.country);
+    assert_eq!(r.status, ReleaseStatus::Listened);
+    assert_eq!(r.rating, before.rating);
+    assert_eq!(r.did_not_finish, before.did_not_finish);
+    assert_eq!(r.date_listened, before.date_listened);
+    assert_eq!(r.notes, before.notes);
+    assert_eq!(r.discovery_link, before.discovery_link);
+    assert_eq!(r.genres, before.genres);
+    assert_eq!(r.streaming_links, before.streaming_links);
+    // Not the row id, which is local and deliberately absent from the file, but the date
+    // you added it, which is the one timestamp that means something on another machine.
+    assert_eq!(r.created_at, before.created_at);
+    assert_ne!(r.id, before.id, "a new machine assigns its own row ids");
+}
+
+#[tokio::test]
+async fn a_library_survives_a_csv_round_trip() {
+    let (_d, pool) = fresh().await;
+    add_listened(&pool, "Godspeed You! Black Emperor", "Lift Your Skinny Fists, Like Antennas to Heaven",
+                 5.0, "2026-01-04T00:00:00Z", Some("CA"), &["post-rock"]).await;
+    releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
+
+    let (_d2, other) = round_trip(&pool, library::Format::Csv).await;
+    let page = releases::list(&other, &ReleaseFilterParams::default()).await.unwrap();
+    assert_eq!(page.total_elements, 2);
+
+    let gybe = page.content.iter().find(|r| r.artist.starts_with("Godspeed")).unwrap();
+    assert_eq!(gybe.title, "Lift Your Skinny Fists, Like Antennas to Heaven",
+               "the comma in the title survives the delimiter");
+    assert_eq!(gybe.genres, vec!["post-rock"]);
+    assert_eq!(gybe.rating, Some(5.0));
+    let duster = page.content.iter().find(|r| r.artist == "Duster").unwrap();
+    assert_eq!(duster.status, ReleaseStatus::Queued);
+    assert_eq!(duster.rating, None);
+}
+
+#[tokio::test]
+async fn importing_the_same_file_twice_changes_nothing() {
+    // The format promises idempotence. Without it, restoring a backup you are not sure
+    // completed doubles your library.
+    let (_d, pool) = fresh().await;
+    add_listened(&pool, "Slint", "Spiderland", 4.5, "1991-03-27T00:00:00Z", Some("US"), &["rock"]).await;
+    let text = library::to_json(&collect_export(&pool).await.unwrap(), "0.1.0", "x").unwrap();
+
+    let (_d2, other) = fresh().await;
+    let first = import_library(&other, "lib.json", &text, ImportMode::Skip).await.unwrap();
+    let second = import_library(&other, "lib.json", &text, ImportMode::Skip).await.unwrap();
+
+    assert_eq!((first.added, first.skipped), (1, 0));
+    assert_eq!((second.added, second.skipped), (0, 1));
+    assert_eq!(releases::list(&other, &ReleaseFilterParams::default()).await.unwrap().total_elements, 1);
+}
+
+#[tokio::test]
+async fn skip_leaves_your_own_rating_and_notes_alone() {
+    let (_d, pool) = fresh().await;
+    let id = add_listened(&pool, "Slint", "Spiderland", 2.0, "2026-01-01T00:00:00Z", Some("US"), &[]).await;
+    releases::update(&pool, &id, ReleaseUpdateRequest { notes: Some("mine".into()), ..Default::default() })
+        .await.unwrap();
+
+    let incoming = format!(
+        r#"{{"format":"{}","formatVersion":1,"releases":[
+             {{"artist":"slint","title":"SPIDERLAND","rating":5,"notes":"theirs","status":"LISTENED"}}]}}"#,
+        library::FORMAT
+    );
+    let report = import_library(&pool, "lib.json", &incoming, ImportMode::Skip).await.unwrap();
+    assert_eq!(report.skipped, 1);
+
+    let r = releases::get(&pool, &id).await.unwrap();
+    assert_eq!(r.rating, Some(2.0));
+    assert_eq!(r.notes.as_deref(), Some("mine"));
+}
+
+#[tokio::test]
+async fn overwrite_replaces_every_field_including_the_ones_it_clears() {
+    let (_d, pool) = fresh().await;
+    let id = add_listened(&pool, "Slint", "Spiderland", 2.0, "2026-01-01T00:00:00Z", Some("US"),
+                          &["rock", "noise"]).await;
+    releases::update(&pool, &id, ReleaseUpdateRequest { notes: Some("mine".into()), ..Default::default() })
+        .await.unwrap();
+
+    // No rating, no notes, no date and no genres: an overwrite has to clear them, because
+    // half-replacing would be the merge mode the format refuses to offer.
+    let incoming = format!(
+        r#"{{"format":"{}","formatVersion":1,"releases":[
+             {{"artist":"Slint","title":"Spiderland","releaseYear":1991,"country":"US"}}]}}"#,
+        library::FORMAT
+    );
+    let report = import_library(&pool, "lib.json", &incoming, ImportMode::Overwrite).await.unwrap();
+    assert_eq!((report.added, report.overwritten, report.skipped), (0, 1, 0));
+
+    let r = releases::get(&pool, &id).await.unwrap();
+    assert_eq!(r.rating, None);
+    assert_eq!(r.notes, None);
+    assert_eq!(r.date_listened, None);
+    assert_eq!(r.status, ReleaseStatus::Queued);
+    assert!(r.genres.is_empty());
+    assert_eq!(r.release_year, Some(1991));
+}
+
+#[tokio::test]
+async fn a_musicbrainz_id_matches_across_a_renamed_title() {
+    // Rule one of the identity order. The text can differ; the id is the album.
+    let (_d, pool) = fresh().await;
+    let mut r = req("Slint", "Spiderland (2014 remaster)");
+    r.musicbrainz_id = Some("266e8eb6-244f-450d-b419-7e3cdf815d4c".into());
+    let created = releases::create(&pool, r).await.unwrap();
+
+    let incoming = format!(
+        r#"{{"format":"{}","formatVersion":1,"releases":[
+             {{"artist":"Slint","title":"Spiderland",
+               "musicbrainzId":"266e8eb6-244f-450d-b419-7e3cdf815d4c"}}]}}"#,
+        library::FORMAT
+    );
+    let report = import_library(&pool, "lib.json", &incoming, ImportMode::Skip).await.unwrap();
+    assert_eq!(report.skipped, 1);
+    assert_eq!(releases::list(&pool, &ReleaseFilterParams::default()).await.unwrap().total_elements, 1);
+    assert!(releases::get(&pool, &created.id).await.is_ok());
+}
+
+#[tokio::test]
+async fn a_release_you_deleted_comes_back_onto_its_own_catalog_row() {
+    // Delete keeps the catalog entry. Re-importing has to reuse it rather than inserting a
+    // second copy of the same album under a new id.
+    let (_d, pool) = fresh().await;
+    let id = add_listened(&pool, "Duster", "Stratosphere", 4.0, "2026-01-01T00:00:00Z", None, &[]).await;
+    let text = library::to_json(&collect_export(&pool).await.unwrap(), "0.1.0", "x").unwrap();
+    releases::delete(&pool, &id).await.unwrap();
+
+    let report = import_library(&pool, "lib.json", &text, ImportMode::Skip).await.unwrap();
+    assert_eq!(report.added, 1);
+
+    let page = releases::list(&pool, &ReleaseFilterParams::default()).await.unwrap();
+    assert_eq!(page.total_elements, 1);
+    assert_eq!(page.content[0].id, id, "the catalog row is reused, so the id is the old one");
+
+    let catalog: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM releases")
+        .fetch_one(&pool).await.unwrap();
+    assert_eq!(catalog, 1, "no duplicate catalog row");
+}
+
+#[tokio::test]
+async fn two_rows_sharing_a_musicbrainz_id_become_one_release() {
+    // The column is UNIQUE, so a file claiming one id twice cannot produce two rows. The
+    // id is the identity: the second row is the same album, described differently.
+    let (_d, pool) = fresh().await;
+    let incoming = format!(
+        r#"{{"format":"{}","formatVersion":1,"releases":[
+             {{"artist":"Slint","title":"Spiderland",
+               "musicbrainzId":"266e8eb6-244f-450d-b419-7e3cdf815d4c"}},
+             {{"artist":"Slint","title":"Spiderland (remaster)",
+               "musicbrainzId":"266e8eb6-244f-450d-b419-7e3cdf815d4c"}}]}}"#,
+        library::FORMAT
+    );
+
+    let report = import_library(&pool, "lib.json", &incoming, ImportMode::Skip).await.unwrap();
+    assert_eq!((report.added, report.skipped), (1, 1));
+    assert!(report.rejected.is_empty(), "{:?}", report.rejected);
+
+    let page = releases::list(&pool, &ReleaseFilterParams::default()).await.unwrap();
+    assert_eq!(page.total_elements, 1);
+    assert_eq!(page.content[0].title, "Spiderland", "the first row wins under skip");
+}
+
+#[tokio::test]
+async fn an_imported_release_is_findable_in_the_search_index() {
+    // The FTS table is external-content and kept in step by triggers. An insert that goes
+    // around them would leave a release the catalog knows about and search does not.
+    let (_d, pool) = fresh().await;
+    let incoming = "artist,title\nStereolab,Dots and Loops\n";
+    import_library(&pool, "lib.csv", incoming, ImportMode::Skip).await.unwrap();
+
+    let hits = releases::search_catalog(&pool, "stereo", 10).await.unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].title.as_deref(), Some("Dots and Loops"));
+}
+
+#[tokio::test]
+async fn a_file_that_is_not_a_library_is_refused_before_anything_is_written() {
+    let (_d, pool) = fresh().await;
+    releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
+
+    let err = import_library(&pool, "notes.json", r#"{"todo":["buy milk"]}"#, ImportMode::Overwrite)
+        .await
+        .unwrap_err();
+    assert!(err.to_string().contains("not a Trecker export"), "{err}");
+    assert_eq!(releases::list(&pool, &ReleaseFilterParams::default()).await.unwrap().total_elements, 1);
+}
+
+#[tokio::test]
+async fn genres_from_a_file_reuse_the_ones_already_there() {
+    let (_d, pool) = fresh().await;
+    add_listened(&pool, "Slint", "Spiderland", 4.5, "2026-01-01T00:00:00Z", None, &["Jazz"]).await;
+
+    import_library(&pool, "lib.csv", "artist,title,genres\nDuster,Stratosphere,jazz\n", ImportMode::Skip)
+        .await
+        .unwrap();
+
+    assert_eq!(releases::list_genres(&pool).await.unwrap(), vec!["Jazz"],
+               "case-insensitive find-or-create, as on every other path");
+}

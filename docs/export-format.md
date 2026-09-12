@@ -1,8 +1,12 @@
 # Library export format
 
 A specification for exporting a Trecker library and importing it back, on the same
-machine or another one. Written before either side is built, so the two are implemented
+machine or another one. Written before either side was built, so the two were implemented
 against one document rather than against each other.
+
+Both are now built, under **Info → Backup**. The format lives in `src-tauri/src/library/`
+and the writing in `repo::releases::import_one`; where this document and the code
+disagree, this document is right and the code is a bug.
 
 ## What the format has to survive
 
@@ -28,9 +32,19 @@ A release is matched against the existing library in this order, stopping at the
 1. `musicbrainzId`, when both sides have one
 2. `artist` and `title`, compared case-insensitively after trimming
 
-This mirrors the precedence `repo::releases::create` already uses to dedupe the catalog,
-minus the Spotify step, so import reuses logic that is already tested rather than
-inventing a second notion of sameness.
+Rule 1 mirrors the precedence `repo::releases::create` already uses to dedupe the catalog,
+so import reuses logic that is already tested rather than inventing a second notion of
+sameness. Rule 2 exists only here, because guessing that identical text means an identical
+album is a judgement the import report can show you and a silent `create()` cannot.
+
+Both rules are matched against the **catalog**, not only against what you currently track.
+A release you deleted keeps its catalog row, so re-importing it lands back on that row
+rather than creating a second copy of the same album under a new id.
+
+Case-insensitivity is SQLite's `COLLATE NOCASE`, which folds ASCII and nothing else, so
+"BJORK" matches "björk" only in its first four letters' worth of luck. That is the same
+limit every text sort and the genre lookup already carry, and matching more loosely here
+would merge records rather than order them.
 
 There is no `spotifyId` anywhere any more. Nothing had written one since Spotify became
 link-only, so the column was removed from the schema along with the dedup step that
@@ -127,11 +141,29 @@ Two columns cannot be flat:
   It is unreadable in a spreadsheet and that is accepted: nobody reads streaming links in
   a spreadsheet.
 
-Empty cells are null. Booleans are `true` and `false` lowercase.
+Empty cells are null. Booleans are `true` and `false` lowercase. Records are separated by
+`\n`; RFC 4180 asks for CRLF and reading accepts either.
 
 CSV carries no envelope, so it has no version and no format discriminator. Import
 therefore validates it by its header row, and a CSV missing `artist` or `title` is
 rejected.
+
+### Reading one a person typed
+
+The point of CSV is that you can write one by hand or export it from something else, so
+reading is deliberately more generous than writing:
+
+- Headers are matched ignoring case and surrounding spaces, and unknown columns are
+  ignored rather than refused.
+- A leading byte order mark is stripped. Excel writes one.
+- Everything but `artist` and `title` may be missing entirely. A missing `status` reads as
+  `QUEUED`, the state every release passes through.
+- `didNotFinish` accepts `1`, `0`, `yes` and `no` alongside `true` and `false`.
+- A bare `YYYY-MM-DD` in either date column becomes midnight UTC, because everything
+  downstream sorts and groups these as strings and two shapes in one column would quietly
+  break the activity chart.
+- Genres are trimmed, dropped when empty, and deduplicated case-insensitively, matching
+  what the catalog would hold anyway.
 
 ## What is not exported
 
@@ -160,8 +192,25 @@ There is deliberately no "merge" mode. Merging needs a rule for every field, and
 honest rule for a rating or a note is that there is no rule: one of them is simply wrong,
 and only the person can say which.
 
+Overwrite replaces the shared catalog entry too. Adding does not: when a release is new to
+you but its catalog row already exists, that row is left exactly as it is, for the same
+reason `create()` leaves a matched one alone. The catalog is content-addressed shared data,
+and an import that is adding *tracking* has no business rewriting it.
+
 Import reports counts of added, overwritten and skipped releases, plus any rows rejected
-for failing validation, so a partial import is visible rather than silent.
+for failing validation, so a partial import is visible rather than silent. Each release is
+written in its own transaction: a row that cannot be stored joins the rejected list instead
+of abandoning the rows after it.
+
+A row is rejected, rather than quietly corrected, when its artist or title is blank, its
+status is a word other than `QUEUED` or `LISTENED`, its rating is outside 0.5 to 5.0 or not
+on a half step, or a date is neither a plain date nor an RFC3339 timestamp. Silently
+rounding someone's rating would be the same invisible edit the format refuses to make when
+it declines to offer a merge mode.
+
+Three failures stop the whole file before anything is written, because each one means the
+file is not what it claims to be: a missing or wrong `format`, a `formatVersion` newer than
+this build reads, and a `releaseCount` that disagrees with the array.
 
 Genres arriving from a file go through the same case-insensitive find-or-create as any
 other path, so importing `Jazz` into a library that has `jazz` does not create a second.

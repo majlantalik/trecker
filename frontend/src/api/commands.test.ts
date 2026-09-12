@@ -10,6 +10,7 @@ const { releasesApi } = await import('./releases')
 const { genresApi, countriesApi } = await import('./genres')
 const { statsApi } = await import('./stats')
 const { infoApi } = await import('./info')
+const { libraryApi } = await import('./library')
 
 beforeEach(() => {
   invoke.mockReset()
@@ -118,6 +119,24 @@ describe('stats commands', () => {
   it('yearEnd forwards an absent year as undefined', async () => {
     await statsApi.getYearEnd()
     expect(invoke).toHaveBeenCalledWith('stats_year_end', { year: undefined })
+  })
+})
+
+describe('library commands', () => {
+  it('export sends the path and the format', async () => {
+    await libraryApi.export('/home/me/library.json', 'json')
+    expect(invoke).toHaveBeenCalledWith('library_export', {
+      path: '/home/me/library.json',
+      format: 'json'
+    })
+  })
+
+  it('import sends the path and the mode', async () => {
+    await libraryApi.import('/home/me/library.csv', 'overwrite')
+    expect(invoke).toHaveBeenCalledWith('library_import', {
+      path: '/home/me/library.csv',
+      mode: 'overwrite'
+    })
   })
 })
 

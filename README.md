@@ -102,6 +102,27 @@ One SQLite file:
 
 The Info view shows the exact path. Back it up by copying the file while the app is closed.
 
+### Export and import
+
+**Info → Backup** writes your whole library to a file and reads one back.
+
+- **JSON** is the complete record and the one to keep for a backup or a move to another
+  machine.
+- **CSV** holds the same releases in a shape a spreadsheet can read. It round-trips too.
+
+Neither carries the album artwork itself, only the address it lives at, so a library
+restored years later shows no art for any release whose URL has rotted. Refreshing metadata
+repairs those.
+
+On the way in, a release is matched by its MusicBrainz id, then by artist and title. You
+choose what happens when it matches something you already have: **Keep mine**, the default,
+leaves your copy alone, and **Replace mine** takes every field from the file. There is no
+merge, because the honest rule for a rating or a note is that one of the two is wrong and
+only you can say which. Importing the same file twice changes nothing the second time.
+
+Rows the file gets wrong are listed rather than silently dropped, and the rest still land.
+The format is specified in [docs/export-format.md](docs/export-format.md).
+
 ---
 
 ## Developer Guide
@@ -159,8 +180,8 @@ binary. Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 31 frontend tests
-npm run test:rust  # 47 Rust tests
+npm test           # 84 frontend tests
+npm run test:rust  # 100 Rust tests
 npm run test:net   # 5 tests against the live metadata services
 ```
 
@@ -175,7 +196,8 @@ trecker/
 ├── package.json              workspace root; owns the Tauri scripts
 ├── frontend/                 Vue 3 application
 │   └── src/
-│       ├── api/              releases.ts, genres.ts, stats.ts, settings.ts
+│       ├── api/              releases.ts, genres.ts, stats.ts, info.ts,
+│       │                     library.ts, dialog.ts
 │       │                     the only place that knows about Tauri
 │       ├── components/
 │       │   ├── layout/       AppLayout, AppSidebar
@@ -184,6 +206,7 @@ trecker/
 │       │   ├── release/      QuickAddBar, ReleaseCard, ReleaseForm,
 │       │   │                 QuickLogModal, GenreTagInput
 │       │   └── stats/        ActivityChart, BreakdownChart, TopRatedList, YearEndList
+│       ├── composables/      keyboard shortcuts, useLibraryTransfer
 │       ├── stores/           releases.ts, genres.ts, stats.ts (Pinia)
 │       ├── types/index.ts    single source of truth for TS interfaces
 │       └── views/            QueueView, LibraryView, StatsView, EntryView, InfoView
@@ -195,9 +218,11 @@ trecker/
 │       ├── db.rs             pool, pragmas, migrations, diagnostics
 │       ├── domain.rs         wire types
 │       ├── error.rs          AppError → { code, message }
+│       ├── library/          the export and import file format
 │       ├── repo/             sqlx queries, filter builder, integration tests
 │       └── resolve/          MusicBrainz + Cover Art Archive
 ├── backend/                  FROZEN Spring Boot app; see TAURI-MIGRATION.md
+├── docs/export-format.md     the library file format, specified
 └── TAURI-MIGRATION.md        the migration record and remaining plan
 ```
 
@@ -208,7 +233,7 @@ Art Archive are open, and everything else is local.
 
 ### Command surface
 
-Seventeen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
+Nineteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
 | Command | Purpose |
 |---|---|
@@ -229,6 +254,8 @@ Seventeen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `stats_top_rated` | Top-rated listened releases |
 | `stats_year_end` | Ranked list for a year |
 | `info_db` | Database path, size, schema version, pragmas |
+| `library_export` | Write the whole library to a JSON or CSV file |
+| `library_import` | Read one back, skipping or overwriting what matches |
 
 `frontend/src/api/commands.test.ts` asserts every name and argument key, so a rename on
 either side of the boundary fails in CI rather than at runtime.
@@ -266,7 +293,7 @@ one, create `NNNN_description.sql`. There is no master file to register it in.
 - [x] MusicBrainz and Cover Art Archive metadata
 - [x] Full-text catalog search
 - [ ] Signed and notarised builds, auto-update
-- [ ] Export to CSV / JSON
+- [x] Export and import, CSV and JSON
 - [ ] Optional account-based sync between devices
 - [x] Keyboard shortcuts (in-app)
 - [ ] Global quick-add shortcut (needs a tray icon; see the Wayland caveat in TAURI-MIGRATION.md)

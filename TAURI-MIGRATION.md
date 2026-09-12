@@ -655,8 +655,42 @@ had described the Spring Boot web app, which no longer exists on this branch.
   and the library already had empty states, so a fresh database reads as deliberate rather
   than broken. Seed rows in a personal library are clutter you have to delete.
 
+## After the merge
+
+The branch is on `main`. Everything below happened there.
+
+### Spotify identifiers are gone from the schema
+
+`spotify_id` was dropped by editing `0001_initial.sql` rather than adding a second
+migration. sqlx checksums applied migrations, so an edited one makes an existing database
+refuse to open: the local file was backed up, dumped, recreated and restored. That option
+disappears the day this ships to anyone but its author.
+
+It also avoided a real cost. SQLite cannot drop an indexed column in place, so the
+alternative meant rebuilding `releases`, which changes rowids, which silently invalidates
+the external-content FTS index.
+
+The dedup lookup lost its loop over a pair of column names and with it the last place a
+column name reached SQL by interpolation.
+
+### Export and import
+
+Specified first, in `docs/export-format.md`, then built against the document:
+`src-tauri/src/library/` for what the bytes mean and `repo::releases::import_one` for the
+writing. JSON is canonical, CSV round-trips, and neither carries a local row id.
+
+Two things worth remembering:
+
+- **Validation makes the database's constraints unreachable.** Status, rating and the
+  timestamp shapes are checked before any SQL runs, so the `UNIQUE` and `CHECK` clauses
+  cannot be reached through import. A defensive error mapping written for one of them was
+  removed once no test could provoke it.
+- **`tauri-plugin-dialog` costs 3.5 MB.** The binary went from 4.2 MB to 7.7 MB for native
+  file pickers, which is most of what fat LTO buys back. Worth it for a dialog people will
+  use twice a year, but it is the whole reason the binary is no longer small.
+
 ## Open decisions
 
-1. **Merge this branch.** Nineteen commits and 127 files sit on `worktree-tauri-migration`
-   while `main` still holds the Spring Boot web app. Everything from Phase 0 to the
-   keyboard shortcuts is here and nowhere else.
+1. **Signing and CI.** Builds are unsigned and produced by hand on one machine. A GitHub
+   Actions matrix and an auto-updater are the next thing between this and something other
+   people can install.

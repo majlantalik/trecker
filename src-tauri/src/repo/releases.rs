@@ -5,6 +5,7 @@ use super::{hydrate, map_err, new_id, now, push_id_list, RELEASE_COLUMNS};
 use crate::db::LOCAL_USER_ID;
 use crate::domain::*;
 use crate::error::{AppError, AppResult};
+use crate::library::{ExportedRelease, ImportMode};
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use std::collections::HashMap;
 
@@ -472,4 +473,222 @@ async fn set_links(
 /// collide on the UNIQUE constraint; NULL does not collide with NULL.
 fn blank_to_none(v: &Option<String>) -> Option<&str> {
     v.as_deref().map(str::trim).filter(|s| !s.is_empty())
+}
+
+// ---------------------------------------------------------------- export and import
+
+/// A tracked release plus the catalog identifier an export carries.
+///
+/// `Release` deliberately does not expose `musicbrainz_id` to the frontend, but the file
+/// format needs it: it is the only key that survives a move to another machine.
+pub struct ExportRow {
+    pub release: Release,
+    pub musicbrainz_id: Option<String>,
+}
+
+/// Every tracked release, unpaginated, in the order a person would want to read.
+///
+/// Catalog rows you no longer track are not here. Keeping them after a delete is an
+/// implementation detail of the two-table split, not part of your library.
+pub async fn export_all(pool: &SqlitePool) -> AppResult<Vec<ExportRow>> {
+    let sql = format!(
+        "SELECT {RELEASE_COLUMNS}, r.musicbrainz_id AS musicbrainz_id \
+         FROM user_releases ur JOIN releases r ON r.id = ur.release_id \
+         WHERE ur.user_id = ? \
+         ORDER BY r.artist COLLATE NOCASE, r.title COLLATE NOCASE, ur.id"
+    );
+    let rows = sqlx::query(&sql)
+        .bind(LOCAL_USER_ID)
+        .fetch_all(pool)
+        .await
+        .map_err(map_err)?;
+
+    // Read before `hydrate` consumes the rows. It preserves order, so zipping is safe.
+    let ids: Vec<Option<String>> = rows
+        .iter()
+        .map(|r| r.try_get("musicbrainz_id").map_err(map_err))
+        .collect::<AppResult<_>>()?;
+
+    Ok(hydrate(pool, rows)
+        .await?
+        .into_iter()
+        .zip(ids)
+        .map(|(release, musicbrainz_id)| ExportRow {
+            release,
+            musicbrainz_id,
+        })
+        .collect())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportOutcome {
+    Added,
+    Overwritten,
+    Skipped,
+}
+
+/// Writes one release from a file, in one transaction.
+///
+/// Identity follows `docs/export-format.md`: the MusicBrainz id first, then artist and
+/// title compared case-insensitively. The second rule is a heuristic and can be wrong,
+/// which is why it lives here, where the import report makes the result visible, and not
+/// inside `create`.
+pub async fn import_one(
+    pool: &SqlitePool,
+    r: &ExportedRelease,
+    mode: ImportMode,
+) -> AppResult<ImportOutcome> {
+    let mut tx = pool.begin().await.map_err(map_err)?;
+    let stamp = now();
+
+    let catalog_id = match find_catalog(&mut tx, r.musicbrainz_id.as_deref()).await? {
+        Some(id) => Some(id),
+        None => find_by_name(&mut tx, &r.artist, &r.title).await?,
+    };
+
+    let tracked: Option<String> = match &catalog_id {
+        Some(id) => sqlx::query_scalar(
+            "SELECT id FROM user_releases WHERE release_id = ? AND user_id = ?",
+        )
+        .bind(id)
+        .bind(LOCAL_USER_ID)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_err)?,
+        None => None,
+    };
+
+    if tracked.is_some() && mode == ImportMode::Skip {
+        // Dropping the transaction rolls it back, so a skip writes nothing at all.
+        return Ok(ImportOutcome::Skipped);
+    }
+
+    let status = filter::status_str(crate::library::status_of(r));
+    let did_not_finish = i32::from(r.did_not_finish);
+
+    let release_id = match catalog_id {
+        Some(id) => {
+            // Only an overwrite rewrites the catalog. When this is a new tracking row on a
+            // catalog entry that already exists, the entry stays as it is: it is shared,
+            // content-addressed data, and the same reasoning applies as in `create`, which
+            // also leaves a matched catalog row alone.
+            if mode == ImportMode::Overwrite {
+                sqlx::query(
+                    "UPDATE releases SET artist = ?, title = ?, release_year = ?, \
+                     album_art_url = ?, country = ?, musicbrainz_id = ? WHERE id = ?",
+                )
+                .bind(&r.artist)
+                .bind(&r.title)
+                .bind(r.release_year)
+                .bind(&r.album_art_url)
+                .bind(&r.country)
+                .bind(&r.musicbrainz_id)
+                .bind(&id)
+                .execute(&mut *tx)
+                .await
+                .map_err(map_err)?;
+
+                set_genres(&mut tx, &id, &r.genres).await?;
+                set_links(&mut tx, &id, &to_map(&r.streaming_links)).await?;
+            }
+            id
+        }
+        None => {
+            let id = new_id();
+            sqlx::query(
+                "INSERT INTO releases (id, artist, title, release_year, album_art_url, \
+                 country, musicbrainz_id, created_at) VALUES (?,?,?,?,?,?,?,?)",
+            )
+            .bind(&id)
+            .bind(&r.artist)
+            .bind(&r.title)
+            .bind(r.release_year)
+            .bind(&r.album_art_url)
+            .bind(&r.country)
+            .bind(&r.musicbrainz_id)
+            .bind(&stamp)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_err)?;
+
+            set_genres(&mut tx, &id, &r.genres).await?;
+            set_links(&mut tx, &id, &to_map(&r.streaming_links)).await?;
+            id
+        }
+    };
+
+    let outcome = if tracked.is_some() {
+        // An overwrite replaces every field, a null included. That is the whole difference
+        // from skip: half-replacing would be the merge mode the format refuses to offer.
+        sqlx::query(
+            "UPDATE user_releases SET status = ?, rating = ?, did_not_finish = ?, \
+             date_listened = ?, notes = ?, discovery_link = ?, \
+             created_at = COALESCE(?, created_at), updated_at = ? \
+             WHERE release_id = ? AND user_id = ?",
+        )
+        .bind(status)
+        .bind(r.rating)
+        .bind(did_not_finish)
+        .bind(&r.date_listened)
+        .bind(&r.notes)
+        .bind(&r.discovery_link)
+        .bind(&r.added_at)
+        .bind(&stamp)
+        .bind(&release_id)
+        .bind(LOCAL_USER_ID)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_err)?;
+        ImportOutcome::Overwritten
+    } else {
+        sqlx::query(
+            "INSERT INTO user_releases (id, release_id, user_id, status, rating, \
+             did_not_finish, date_listened, notes, discovery_link, created_at, updated_at) \
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        )
+        .bind(new_id())
+        .bind(&release_id)
+        .bind(LOCAL_USER_ID)
+        .bind(status)
+        .bind(r.rating)
+        .bind(did_not_finish)
+        .bind(&r.date_listened)
+        .bind(&r.notes)
+        .bind(&r.discovery_link)
+        // A file without an addedAt was written by hand. Today is the honest answer.
+        .bind(r.added_at.clone().unwrap_or_else(|| stamp.clone()))
+        .bind(&stamp)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_err)?;
+        ImportOutcome::Added
+    };
+
+    tx.commit().await.map_err(map_err)?;
+    Ok(outcome)
+}
+
+/// The fallback identity rule: same artist, same title, ignoring case.
+///
+/// `COLLATE NOCASE` folds ASCII only, so "BJÖRK" and "Björk" are two releases to this
+/// query. That is the same limitation the genre lookup and every text sort already carry,
+/// and matching more loosely here would merge records rather than order them.
+async fn find_by_name(
+    conn: &mut sqlx::SqliteConnection,
+    artist: &str,
+    title: &str,
+) -> AppResult<Option<String>> {
+    sqlx::query_scalar(
+        "SELECT id FROM releases WHERE artist = ? COLLATE NOCASE AND title = ? COLLATE NOCASE \
+         ORDER BY created_at LIMIT 1",
+    )
+    .bind(artist.trim())
+    .bind(title.trim())
+    .fetch_optional(&mut *conn)
+    .await
+    .map_err(map_err)
+}
+
+fn to_map(links: &std::collections::BTreeMap<String, String>) -> HashMap<String, String> {
+    links.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
 }

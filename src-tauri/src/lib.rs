@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod domain;
 mod error;
+mod library;
 mod repo;
 mod resolve;
 
@@ -10,6 +11,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // The database lives beside the app's other per-user state, which is
             // %APPDATA% on Windows, ~/Library/Application Support on macOS and
@@ -42,6 +44,8 @@ pub fn run() {
             commands::stats_top_rated,
             commands::stats_year_end,
             commands::info_db,
+            commands::library_export,
+            commands::library_import,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

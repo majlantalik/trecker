@@ -113,3 +113,27 @@ export interface DbInfo {
   releaseCount: number
   trackedCount: number
 }
+
+export type ExportFormat = 'json' | 'csv'
+export type ImportMode = 'skip' | 'overwrite'
+
+export interface ExportSummary {
+  path: string
+  format: ExportFormat
+  releaseCount: number
+  bytes: number
+}
+
+export interface RejectedRow {
+  row: number
+  artist: string
+  title: string
+  reason: string
+}
+
+export interface ImportReport {
+  added: number
+  overwritten: number
+  skipped: number
+  rejected: RejectedRow[]
+}
