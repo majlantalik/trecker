@@ -33,8 +33,12 @@ import QuickAddPalette from '@/components/release/QuickAddPalette.vue'
 import ShortcutsHelp from '@/components/common/ShortcutsHelp.vue'
 import { useRouter } from 'vue-router'
 import { useKeySequence } from '@/composables/useKeySequence'
+import { useLaunchActions } from '@/composables/useLaunchActions'
 
 const router = useRouter()
+
+// A desktop shortcut running `trecker --quick-add`, or the tray's Quick add.
+useLaunchActions()
 
 // Gmail-style: the second key is the first letter of where you are going.
 const { pending: pendingPrefix } = useKeySequence('g', {

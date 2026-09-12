@@ -38,6 +38,15 @@
           <span class="user-email">Local library</span>
         </div>
       </RouterLink>
+      <RouterLink
+        to="/settings"
+        class="footer-btn"
+        active-class="footer-btn--active"
+        aria-label="Settings"
+        v-tooltip.top="'Settings'"
+      >
+        <i class="pi pi-cog" />
+      </RouterLink>
       <!-- The only visible way to the shortcuts list, which "?" also opens. Drawn as the key
            itself, so the button teaches the shortcut it stands in for. -->
       <button
@@ -74,13 +83,19 @@ onMounted(() => {
 <style scoped>
 .app-sidebar {
   width: 260px;
-  min-height: 100vh;
+  /* Exactly the window's height, held in place while the page scrolls. With min-height it
+     stretched to the page instead, and on a long page like Info the footer, pushed to the
+     bottom, sat below the screen. A window too short for the sidebar scrolls it. */
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  overflow-y: auto;
   background: linear-gradient(180deg, #0c0d1a 0%, #08090e 100%);
   border-right: 1px solid var(--tk-border);
   display: flex;
   flex-direction: column;
   padding: 0;
-  position: relative;
   flex-shrink: 0;
 }
 
@@ -274,6 +289,30 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+}
+
+.footer-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: rgba(226, 228, 240, 0.6);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.footer-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--tk-accent);
+}
+
+.footer-btn--active {
+  background: rgba(0, 229, 176, 0.08);
+  color: var(--tk-accent);
 }
 
 .shortcuts-btn {

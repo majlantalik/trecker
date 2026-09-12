@@ -4,6 +4,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 // the Rust side in src-tauri/src/commands.rs must keep these names and argument keys, so
 // a rename on either side fails here rather than silently at runtime.
 const invoke = vi.fn()
+const listen = vi.fn()
+vi.mock('@tauri-apps/api/event', () => ({ listen }))
 const convertFileSrc = vi.fn((path: string, protocol: string) => `${protocol}://localhost/${encodeURIComponent(path)}`)
 vi.mock('@tauri-apps/api/core', () => ({ invoke, convertFileSrc }))
 
@@ -13,6 +15,8 @@ const { statsApi } = await import('./stats')
 const { infoApi } = await import('./info')
 const { libraryApi } = await import('./library')
 const { cacheApi, coverSrc } = await import('./cache')
+const { settingsApi } = await import('./settings')
+const { appApi } = await import('./app')
 
 beforeEach(() => {
   invoke.mockReset()
@@ -180,6 +184,37 @@ describe('coverSrc', () => {
     expect(coverSrc(null)).toBeUndefined()
     expect(coverSrc(undefined)).toBeUndefined()
     expect(coverSrc('')).toBeUndefined()
+  })
+})
+
+describe('settings commands', () => {
+  it('get takes no arguments', async () => {
+    await settingsApi.get()
+    expect(invoke).toHaveBeenCalledWith('settings_get')
+  })
+
+  it('update sends the settings as "request"', async () => {
+    await settingsApi.update({ closeAction: 'tray' })
+    expect(invoke).toHaveBeenCalledWith('settings_update', { request: { closeAction: 'tray' } })
+  })
+})
+
+describe('app commands', () => {
+  it('maps each call to its command, with no arguments', async () => {
+    await appApi.takeLaunchAction()
+    expect(invoke).toHaveBeenCalledWith('app_take_launch_action')
+
+    await appApi.quickAddCommand()
+    expect(invoke).toHaveBeenCalledWith('app_quick_add_command')
+  })
+
+  it('listens for the event the Rust side emits', async () => {
+    // Must match QUICK_ADD_EVENT in src-tauri/src/desktop.rs.
+    const callback = vi.fn()
+    await appApi.onQuickAdd(callback)
+    expect(listen).toHaveBeenCalledWith('quick-add', expect.any(Function))
+    listen.mock.calls[0][1]({ payload: null })
+    expect(callback).toHaveBeenCalledOnce()
   })
 })
 

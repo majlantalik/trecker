@@ -38,8 +38,9 @@ Measured on 24 cores, one-line Rust change, warm cache:
 
 **Do not reach for `npm run build` while iterating.** The release profile uses fat LTO in
 a single codegen unit, which optimises the whole binary at once and so leaves 23 of 24
-cores idle. That is deliberate: 7.7 MB against 10.0 MB for thin LTO across 16 units, and
-release builds happen once per release. `npm run dev` is the loop.
+cores idle. That is deliberate: measured at 7.7 MB against 10.0 MB for thin LTO across 16
+units, before the tray and single-instance support took it to 8.8 MB, and release builds
+happen once per release. `npm run dev` is the loop.
 
 If 67 s ever becomes the bottleneck, a faster linker (`mold`) is the next lever; none is
 installed.
@@ -57,7 +58,7 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-134 Rust tests and 129 frontend tests. The Rust integration tests in
+147 Rust tests and 141 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
@@ -76,8 +77,10 @@ frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api
 src-tauri/    The Rust core.
   migrations/ sqlx migrations, replacing Liquibase
   src/
-    commands.rs   the #[tauri::command] surface, 24 commands
+    commands.rs   the #[tauri::command] surface, 28 commands
     covers.rs     the on-disk cover cache and the cover: protocol
+    desktop.rs    --quick-add, the tray, and what closing the window does
+    settings.rs   this computer's preferences, as a JSON file
     db.rs         pool, pragmas, migration runner, DbInfo diagnostics
     domain.rs     wire types, mirroring frontend/src/types/index.ts
     error.rs      AppError, serialized to the frontend as { code, message }
@@ -173,6 +176,32 @@ every `.vue` file for one.
   refused.
 - **Cache file names are FNV-1a hashes** of `250:` plus the URL. Do not swap in std's
   `DefaultHasher`: its algorithm may change between Rust releases and orphan the cache.
+
+### Desktop integration
+
+**Quick add from outside the app is a command, not a global shortcut.** A person binds
+`trecker --quick-add` to a key in their desktop's own settings. An app cannot grab a key on
+Wayland, COSMIC's desktop portal has no GlobalShortcuts interface, and Tauri's
+global-shortcut plugin only works through X11. `desktop.rs` has the detail. Do not add that
+plugin expecting it to work here.
+
+**`tauri-plugin-single-instance` must stay the first plugin registered.** A second launch
+hands its arguments to the running app and exits. It keys on the app identifier, so while
+`npm run dev` is running, launching a release build hands off to the dev app instead of
+starting. Quit the dev app before testing a release binary.
+
+**A quick add request reaches the page two ways.** The launch that starts the app stores it
+in `LaunchAction`, and the page takes it once on mount, because an event emitted during
+startup would arrive before anything listens. Later launches and the tray menu emit
+`quick-add`. `useLaunchActions` handles both.
+
+**Closing hides the window only when a tray icon exists.** If creating the tray failed, a
+hidden window would leave an app running with no visible way back, so closing quits.
+`settings_update` applies the tray before saving, so a tray the desktop cannot show is an
+error, not a saved choice that does nothing.
+
+**Settings live in `app_config_dir()/settings.json`, not in the database.** They describe
+this computer, not the library, so an export must not carry them.
 
 ### Export and import
 

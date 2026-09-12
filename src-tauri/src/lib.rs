@@ -1,17 +1,24 @@
 mod commands;
 mod covers;
 mod db;
+mod desktop;
 mod domain;
 mod error;
 mod library;
 mod repo;
 mod resolve;
+mod settings;
 
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // First, as the plugin requires: a second launch must be caught before anything
+        // else starts, or two copies of the app would open the same database.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            desktop::on_second_instance(app, args);
+        }))
         .plugin(tauri_plugin_dialog::init())
         // Every album cover the webview shows comes through here. See `covers.rs`.
         .register_asynchronous_uri_scheme_protocol(covers::SCHEME, |ctx, request, responder| {
@@ -40,7 +47,24 @@ pub fn run() {
             // derived from stored URLs, and a system cleaner removing them loses nothing.
             let covers = app.path().app_cache_dir()?.join("covers");
             app.manage(covers::CoverCache::new(covers, &version));
+
+            let settings = settings::SettingsStore::load(app.path().app_config_dir()?.join("settings.json"));
+            let close_action = settings.get().close_action;
+            app.manage(settings);
+            app.manage(desktop::LaunchAction::from_args(std::env::args()));
+
+            // A tray this desktop cannot show must not stop the app from starting. Closing
+            // the window then quits, because `on_close_requested` only hides it when the
+            // tray exists.
+            if let Err(e) = desktop::apply_close_action(app.handle(), close_action) {
+                eprintln!("{e}");
+            }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                desktop::on_close_requested(window, api);
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::releases_list,
@@ -67,6 +91,10 @@ pub fn run() {
             commands::cache_covers_info,
             commands::cache_covers_clear,
             commands::cache_webview_clear,
+            commands::settings_get,
+            commands::settings_update,
+            commands::app_take_launch_action,
+            commands::app_quick_add_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

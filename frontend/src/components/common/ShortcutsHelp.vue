@@ -24,7 +24,7 @@
     <p class="sch-note">
       Shortcuts are ignored while you are typing, apart from the two that open quick add
       and the one that closes a dialog. Sequences expire after a moment if you stop
-      halfway.
+      halfway. To open quick add from outside Trecker, see Settings.
     </p>
   </Dialog>
 </template>

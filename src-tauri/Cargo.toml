@@ -14,7 +14,10 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
+# A second launch hands its arguments to the running app and exits. This is what lets a
+# desktop shortcut run `trecker --quick-add` and reach the window that is already open.
+tauri-plugin-single-instance = "2"
 # The native save and open dialogs for library export and import. The only plugin in the
 # build: everything else the app needs, it does itself.
 tauri-plugin-dialog = "2"

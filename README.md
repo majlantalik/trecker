@@ -63,9 +63,10 @@ Everything you have not listened to yet.
 
 ### Keyboard shortcuts
 
-Press <kbd>?</kbd> for the list. <kbd>Shift</kbd> <kbd>Shift</kbd> opens quick add from
-anywhere, in the style of a JetBrains IDE; <kbd>Ctrl</kbd>+<kbd>K</kbd> does the same for
-anyone who reaches for that first.
+Press <kbd>?</kbd> for the list, or click the <kbd>?</kbd> in the sidebar.
+<kbd>Shift</kbd> <kbd>Shift</kbd> opens quick add from anywhere in the app, in the style of
+a JetBrains IDE; <kbd>Ctrl</kbd>+<kbd>K</kbd> does the same for anyone who reaches for that
+first.
 
 Navigation follows Gmail: <kbd>G</kbd> then the first letter of where you are going, so
 <kbd>G</kbd> <kbd>L</kbd> for Library. A hint appears while the sequence is half-entered.
@@ -86,6 +87,32 @@ and names, and the country filter offers only the ones you actually have.
 
 Listening activity by month, breakdowns by genre and country, your top-rated releases, and
 a ranked year-end list for any year.
+
+### Quick add from anywhere
+
+To open quick add while you are in another app, bind a key to Trecker's quick add command
+in your desktop's keyboard settings, as a custom shortcut that runs a command. **Settings**
+shows the exact command for your copy of Trecker, with a button to copy it. Usually it is:
+
+```bash
+trecker --quick-add
+```
+
+If Trecker is running, its window comes forward with quick add open. If it is not, the
+command starts it first.
+
+Trecker cannot claim a key for the whole desktop by itself: on Wayland, which COSMIC and
+most current Linux desktops use, only the desktop can.
+
+### Settings
+
+The cog in the sidebar opens **Settings**, which holds preferences for this computer only.
+They are not part of your library and are not exported.
+
+- **When you close the window**: quit, or keep running with an icon in the tray. The tray
+  menu has Open, Quick add and Quit. Keeping Trecker running makes the quick add shortcut
+  appear instantly instead of starting the app first. Starting Trecker again always brings
+  its window back.
 
 ### Where your data lives
 
@@ -137,7 +164,7 @@ The significant architecture decisions, and the alternatives they beat, are reco
 
 | Layer | Technology |
 |---|---|
-| Shell | Tauri 2 (system webview, ~8 MB binary) |
+| Shell | Tauri 2 (system webview, ~9 MB binary) |
 | Frontend | Vue 3 + Vite + PrimeVue 4 (Aura theme) |
 | State | Pinia |
 | Core | Rust |
@@ -186,8 +213,8 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 129 frontend tests
-npm run test:rust  # 134 Rust tests
+npm test           # 141 frontend tests
+npm run test:rust  # 147 Rust tests
 npm run test:net   # 11 tests against the live metadata services
 ```
 
@@ -240,7 +267,7 @@ Art Archive are open, and everything else is local.
 
 ### Command surface
 
-Twenty-four Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
+Twenty-eight Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
 | Command | Purpose |
 |---|---|
@@ -268,6 +295,10 @@ Twenty-four Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `cache_covers_info` | Where cached covers live, how many, and their size |
 | `cache_covers_clear` | Delete cached covers; they download again when shown |
 | `cache_webview_clear` | Clear the webview's own cache and browser data |
+| `settings_get` | This computer's preferences |
+| `settings_update` | Apply and save preferences, such as keeping running in the tray |
+| `app_take_launch_action` | Whether this launch was started with `--quick-add`, once |
+| `app_quick_add_command` | The command to bind to a desktop shortcut |
 
 Covers are not commands. The webview requests them from the `cover:` protocol, which
 `covers.rs` serves from disk.
@@ -316,5 +347,6 @@ one, create `NNNN_description.sql`. There is no master file to register it in.
 - [x] Export and import, CSV and JSON
 - [ ] Optional account-based sync between devices ([ADR 0006](docs/adr/0006-sync-deferred-backend-frozen.md))
 - [x] Keyboard shortcuts (in-app)
-- [ ] Global quick-add shortcut (needs a tray icon, and Wayland restricts global key capture)
+- [x] Quick add from anywhere, through a desktop shortcut running `trecker --quick-add`
+- [x] Keep running in the tray on close, as a setting
 - [ ] Mobile

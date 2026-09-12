@@ -351,3 +351,45 @@ pub async fn cache_webview_clear(window: tauri::WebviewWindow) -> AppResult<()> 
         .clear_all_browsing_data()
         .map_err(|e| AppError::Internal(format!("could not clear webview data: {e}")))
 }
+
+// ---------------------------------------------------------------- settings and desktop
+
+#[tauri::command]
+pub async fn settings_get(
+    settings: State<'_, crate::settings::SettingsStore>,
+) -> AppResult<crate::settings::Settings> {
+    Ok(settings.get())
+}
+
+/// Applies new settings, then saves them. Applied first so that a tray icon this desktop
+/// cannot show is reported as an error and not saved as a choice that silently does
+/// nothing.
+#[tauri::command]
+pub async fn settings_update(
+    app: tauri::AppHandle,
+    settings: State<'_, crate::settings::SettingsStore>,
+    request: crate::settings::Settings,
+) -> AppResult<crate::settings::Settings> {
+    crate::desktop::apply_close_action(&app, request.close_action)?;
+    settings.replace(request)
+}
+
+/// What this launch was started to do, such as `quick-add`, handed over once.
+#[tauri::command]
+pub async fn app_take_launch_action(
+    launch: State<'_, crate::desktop::LaunchAction>,
+) -> AppResult<Option<String>> {
+    Ok(launch.take())
+}
+
+/// The command a person binds to a desktop shortcut to open quick add.
+#[tauri::command]
+pub async fn app_quick_add_command() -> AppResult<String> {
+    let exe = std::env::current_exe()
+        .map_err(|e| AppError::Internal(format!("could not find the app's own path: {e}")))?;
+    Ok(crate::desktop::quick_add_command(
+        &exe,
+        std::env::var_os("APPIMAGE").as_deref(),
+        std::env::var_os("PATH").as_deref(),
+    ))
+}

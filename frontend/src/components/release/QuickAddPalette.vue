@@ -21,22 +21,19 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
+import { useQuickAddPalette } from '@/composables/useQuickAddPalette'
 import Dialog from 'primevue/dialog'
 import QuickAddBar from './QuickAddBar.vue'
 import { useDoubleTap } from '@/composables/useDoubleTap'
 import { useShortcut } from '@/composables/useShortcut'
 
-const open = ref(false)
+const { open, toggle, show } = useQuickAddPalette()
 const barRef = ref<InstanceType<typeof QuickAddBar> | null>(null)
 
 // Shift twice, as in JetBrains. Ctrl+K is kept as an alias because it is what most people
 // try first, and because a shortcut nobody can guess is a shortcut nobody uses.
-useDoubleTap('Shift', () => {
-  open.value = !open.value
-})
-useShortcut('ctrl+k', () => {
-  open.value = true
-}, { whileTyping: true })
+useDoubleTap('Shift', toggle)
+useShortcut('ctrl+k', show, { whileTyping: true })
 
 async function onShow() {
   // The dialog animates in, so the input does not exist yet when the event fires.

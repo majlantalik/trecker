@@ -155,3 +155,11 @@ export interface CoverCacheInfo {
   count: number
   sizeBytes: number
 }
+
+/** What closing the main window does. */
+export type CloseAction = 'quit' | 'tray'
+
+/** Preferences for how the app behaves on this machine. Not part of the library. */
+export interface Settings {
+  closeAction: CloseAction
+}
