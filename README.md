@@ -64,6 +64,12 @@ Everything you have not listened to yet.
 
 **Log it** saves and returns; **Log + Details** saves and opens the Entry page.
 
+### Keyboard shortcuts
+
+Press <kbd>?</kbd> for the list. <kbd>Shift</kbd> <kbd>Shift</kbd> opens quick add from
+anywhere, in the style of a JetBrains IDE; <kbd>Ctrl</kbd>+<kbd>K</kbd> does the same for
+anyone who reaches for that first.
+
 ### Refreshing metadata
 
 Metadata is fetched once when you add a release. If it came back wrong or incomplete, the
@@ -259,5 +265,6 @@ one, create `NNNN_description.sql`. There is no master file to register it in.
 - [ ] Signed and notarised builds, auto-update
 - [ ] Export to CSV / JSON
 - [ ] Optional account-based sync between devices
-- [ ] Keyboard shortcuts
+- [x] Keyboard shortcuts (in-app)
+- [ ] Global quick-add shortcut (needs a tray icon; see the Wayland caveat in TAURI-MIGRATION.md)
 - [ ] Mobile

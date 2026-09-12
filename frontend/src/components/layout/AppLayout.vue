@@ -13,12 +13,18 @@
         </div>
       </main>
     </div>
+
+    <!-- Mounted once, alongside the header bar. Opens on Shift Shift from anywhere. -->
+    <QuickAddPalette />
+    <ShortcutsHelp />
   </div>
 </template>
 
 <script setup lang="ts">
 import AppSidebar from './AppSidebar.vue'
 import QuickAddBar from '@/components/release/QuickAddBar.vue'
+import QuickAddPalette from '@/components/release/QuickAddPalette.vue'
+import ShortcutsHelp from '@/components/common/ShortcutsHelp.vue'
 </script>
 
 <style scoped>

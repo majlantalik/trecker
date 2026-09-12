@@ -172,6 +172,15 @@ but the field is editable and the resolver falls back to an artist's area name l
 "England". `utils/country.ts` degrades to showing the raw string rather than guessing, and
 gives no flag to user-assigned codes such as XW.
 
+**Shortcuts live in one catalogue.** `composables/shortcuts.ts` is what the help dialog
+renders, so adding a binding without adding it there gives you a shortcut nobody can
+discover. A test asserts every entry lands in a group the dialog shows.
+
+**Synthetic keyboard input does not reach the webview** through the OS-level tooling on
+this machine, so shortcuts cannot be verified that way. `press-key` reports success and
+nothing happens, for modifier and function keys alike. Cover the logic with unit tests and
+have a human press the keys.
+
 **`primeicons` is a separate package** and must stay listed in `package.json`.
 
 **`@primevue/themes` 4.5.x** is deprecated upstream but the Aura theme still works; do not
