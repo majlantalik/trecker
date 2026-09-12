@@ -31,18 +31,11 @@ A pre-filled form opens either way. Adjust anything, then **Add to Queue**.
 Existing releases in your library appear as suggestions while you type, so adding
 something you already have does not create a duplicate.
 
-### Why streaming links are not resolved
+### Streaming links
 
-Spotify, Tidal and YouTube all require a developer credential to query, and a credential
-shipped inside a desktop app is not a credential. The alternative would be asking you to
-hold a paid subscription and register your own developer app before adding an album, which
-is not a reasonable thing to ask.
-
-So Trecker keeps the link and looks nothing up. Sharing parameters like `si=` are stripped
-first, since they identify whoever sent you the link.
-
-MusicBrainz and the Cover Art Archive need no account at all, which is why they do the
-work.
+Spotify, Tidal and YouTube links are saved but nothing is looked up through them. Sharing
+parameters like `si=` are stripped first, since they identify whoever sent you the link.
+The reasoning is in [ADR 0003](docs/adr/0003-streaming-services-are-link-only.md).
 
 ### Queue
 
@@ -116,22 +109,25 @@ repairs those.
 
 On the way in, a release is matched by its MusicBrainz id, then by artist and title. You
 choose what happens when it matches something you already have: **Keep mine**, the default,
-leaves your copy alone, and **Replace mine** takes every field from the file. There is no
-merge, because the honest rule for a rating or a note is that one of the two is wrong and
-only you can say which. Importing the same file twice changes nothing the second time.
+leaves your copy alone, and **Replace mine** takes every field from the file. Importing the
+same file twice changes nothing the second time.
 
 Rows the file gets wrong are listed rather than silently dropped, and the rest still land.
-The format is specified in [docs/export-format.md](docs/export-format.md).
+The format is specified in [docs/export-format.md](docs/export-format.md), and the choices
+behind it are in [ADR 0005](docs/adr/0005-library-export-format.md).
 
 ---
 
 ## Developer Guide
 
+The significant architecture decisions, and the alternatives they beat, are recorded in
+[docs/adr/](docs/adr/README.md).
+
 ### Tech stack
 
 | Layer | Technology |
 |---|---|
-| Shell | Tauri 2 (system webview, ~4 MB binary) |
+| Shell | Tauri 2 (system webview, ~8 MB binary) |
 | Frontend | Vue 3 + Vite + PrimeVue 4 (Aura theme) |
 | State | Pinia |
 | Core | Rust |
@@ -170,9 +166,9 @@ npm run build:nobundle # binary only
 ```
 
 Measured on 24 cores after a one-line Rust change: `npm run dev` rebuilds in 5.5 s,
-`build:fast` in 21 s, `build` in 74 s. The release profile is deliberately the slowest
-configuration, fat link-time optimisation in one codegen unit, because it halves the
-binary. Iterate with `npm run dev`, not with `npm run build`.
+`build:fast` in 21 s, `build` in 67 s. The release profile is deliberately the slowest
+configuration, fat link-time optimisation in one codegen unit, for the smallest binary.
+Iterate with `npm run dev`, not with `npm run build`.
 
 > `cargo build --release` on its own produces a binary that tries to reach the dev server.
 > Always build through the Tauri CLI.
@@ -221,9 +217,9 @@ trecker/
 │       ├── library/          the export and import file format
 │       ├── repo/             sqlx queries, filter builder, integration tests
 │       └── resolve/          MusicBrainz + Cover Art Archive
-├── backend/                  FROZEN Spring Boot app; see TAURI-MIGRATION.md
-├── docs/export-format.md     the library file format, specified
-└── TAURI-MIGRATION.md        the migration record and remaining plan
+├── backend/                  FROZEN Spring Boot app; see ADR 0006
+├── docs/adr/                 architecture decision records
+└── docs/export-format.md     the library file format, specified
 ```
 
 ### Configuration
@@ -262,11 +258,11 @@ either side of the boundary fails in CI rather than at runtime.
 
 ### Data model
 
-A shared catalog plus per-user tracking, kept from the web app because it is what would
-make sync tractable later:
+A shared catalog plus per-user tracking. Why the split is kept with one user:
+[ADR 0002](docs/adr/0002-sqlite-with-catalog-and-tracking-split.md). Why the key is a
+release group: [ADR 0004](docs/adr/0004-release-group-is-album-identity.md).
 
-- `releases` — deduplicated catalog, keyed by the album's MusicBrainz release group, so
-  every pressing of one album is one row.
+- `releases` — deduplicated catalog, keyed by the album's MusicBrainz release group.
 - `user_releases` — status, rating, notes, dates. Deleting one leaves the catalog row.
 
 The `id` in an API response is the catalog release id; `createdAt` is from the tracking
@@ -293,9 +289,13 @@ one, create `NNNN_description.sql`. There is no master file to register it in.
 - [x] Local-first rewrite: Tauri 2 + SQLite, no server
 - [x] MusicBrainz and Cover Art Archive metadata
 - [x] Full-text catalog search
-- [ ] Signed and notarised builds, auto-update
+- [ ] Auto-update through `tauri-plugin-updater`, with a manifest on GitHub Releases
+- [ ] GitHub Actions build for all three platforms
+- [ ] macOS signing and notarisation (Apple Developer Program, 99 USD a year)
+- [ ] Windows signing (the certificate needs a hardware token, which complicates CI)
+- [ ] `.rpm` bundle (needs `rpmbuild` on the build machine; left out so the build does not fail)
 - [x] Export and import, CSV and JSON
-- [ ] Optional account-based sync between devices
+- [ ] Optional account-based sync between devices ([ADR 0006](docs/adr/0006-sync-deferred-backend-frozen.md))
 - [x] Keyboard shortcuts (in-app)
-- [ ] Global quick-add shortcut (needs a tray icon; see the Wayland caveat in TAURI-MIGRATION.md)
+- [ ] Global quick-add shortcut (needs a tray icon, and Wayland restricts global key capture)
 - [ ] Mobile

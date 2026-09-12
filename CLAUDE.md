@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Trecker is a **local-first Tauri 2 desktop app**: a Vue 3 frontend in a native webview,
 a Rust core, and a SQLite file on the user's machine. There is no server and no account.
+Why: [ADR 0001](docs/adr/0001-local-first-tauri-app.md).
 
-It used to be a Spring Boot web app. `backend/` is still here but **frozen** — see
-[TAURI-MIGRATION.md](TAURI-MIGRATION.md) for what moved and why. Do not add features
-there; it exists as the starting point for an optional sync server.
+It used to be a Spring Boot web app. `backend/` is still here but **frozen**. Do not add
+features there; it exists as the starting point for an optional sync server. Why:
+[ADR 0006](docs/adr/0006-sync-deferred-backend-frozen.md).
 
 ## Development environment
 
@@ -39,10 +40,6 @@ Measured on 24 cores, one-line Rust change, warm cache:
 a single codegen unit, which optimises the whole binary at once and so leaves 23 of 24
 cores idle. That is deliberate: 7.7 MB against 10.0 MB for thin LTO across 16 units, and
 release builds happen once per release. `npm run dev` is the loop.
-
-That saving used to be 4.2 MB against 8.2 MB. `tauri-plugin-dialog` added 3.5 MB of
-already-compact code, so fat LTO now buys 23% rather than half. It is still the right
-default and it is no longer the reason the binary is small.
 
 If 67 s ever becomes the bottleneck, a faster linker (`mold`) is the next lever; none is
 installed.
@@ -87,7 +84,13 @@ src-tauri/    The Rust core.
     repo/         sqlx queries; filter.rs is the UserReleaseSpecification port
     resolve/      MusicBrainz + Cover Art Archive
 backend/      FROZEN. Spring Boot, kept only for a future sync server.
+docs/adr/     architecture decision records
 ```
+
+**The reasons live in [docs/adr/](docs/adr/README.md), not here.** This file states the
+rules that follow from those decisions. Do not copy an ADR's reasoning into this file;
+link to it. Before reversing one of those decisions, read its ADR. To overturn it, write a
+new ADR and mark the old one superseded rather than editing it.
 
 ### The command boundary
 
@@ -100,16 +103,14 @@ it that way.** If a view starts importing `invoke` directly, the seam has leaked
 
 ### Data model: two-table split
 
-Preserved from the web app even though there is exactly one local user, because it is what
-would make sync tractable later:
+Do not collapse these into one table. Why: [ADR 0002](docs/adr/0002-sqlite-with-catalog-and-tracking-split.md).
 
 - `releases` — deduplicated catalog, keyed by `musicbrainz_release_group_id` (UNIQUE).
-  Content-addressed, so these rows cannot conflict between devices. A release with no
-  MusicBrainz id is never merged with another: guessing that identical text means an
-  identical album belongs in import, where the result is visible, not inside `create()`.
+  `create()` never merges a release that has no id with another one; text matching
+  belongs to import only.
 - `user_releases` — per-user tracking. Status, rating, notes, `did_not_finish`,
-  `date_listened`, `discovery_link`. Carries `user_id` (a local sentinel) and `updated_at`
-  purely so sync would not need a schema change.
+  `date_listened`, `discovery_link`. Keep writing `user_id` (a local sentinel) and
+  `updated_at` even though nothing reads them yet.
 
 **Delete removes only the `user_releases` row.** The catalog row stays.
 
@@ -121,64 +122,41 @@ The `id` in every API response is the **catalog release id**, not the tracking r
 `releases_resolve` → `resolve/mod.rs` → MusicBrainz for identity and genres, Cover Art
 Archive for artwork, both best-effort.
 
-**Spotify, Tidal and YouTube are link-only and will stay that way.** All three need a
-credential that cannot ship in a binary. A pasted streaming URL is saved as a link with
-sharing parameters stripped; nothing is queried through it. Bandcamp and Apple Music put
-the artist and album in the URL path, so those are read and searched.
+**Spotify, Tidal and YouTube are link-only.** Do not add lookups through them or any
+credential for them. A pasted streaming URL is saved as a link with sharing parameters
+stripped. Bandcamp and Apple Music URLs are read for artist and album, then searched.
+Why: [ADR 0003](docs/adr/0003-streaming-services-are-link-only.md).
 
-**Everything comes from the release group, never a release.** MusicBrainz models an album
-as a *release group* holding every *release*: each pressing, reissue, regional edition and
-format. Trecker tracks albums, so it searches groups, looks up groups, asks the Cover Art
-Archive for the group's cover, and stores the group id as its identity.
+**Use the release group, never a release.** Search, lookup, cover art and the stored id
+all go through the group. Why: [ADR 0004](docs/adr/0004-release-group-is-album-identity.md).
+The rules that follow:
 
-It used to search releases, and every metadata bug this module had came from trusting the
-pressing that search matched. Its year was that edition's, its country was wherever it was
-sold, it often had no genres or art of its own, and adding one album twice could store two
-pressings that dedup could not recognise as the same album.
-
-**Country is the one thing a group does not have**, because where a record was sold is a
-property of a pressing. The country Trecker stores is the credited artist's, falling back to
-their area name. There is deliberately no fallback to a pressing's country: a blank beats a
-Canadian flag on a band from California.
-
-**The top search hit is often not the album.** MusicBrainz scores text alone, so every exact
-title match ties at 100 in no useful order. "The Weeknd - After Hours" ranks the single
-first; "Metallica - Metallica" ranks a bootleg, an interview disc and a compilation above
-the album. `pick_release_group` breaks ties toward a plain album, then toward the group with
-the most releases. It only reorders ties, so a search for an EP still finds the EP.
-
-**Refresh looks up by id.** An album added from a search keeps its group id, so
-`releases_refresh_metadata` fetches that group directly. Only a release typed in by hand
-falls back to searching its artist and title.
-
-**"Release group" never reaches the interface.** It is MusicBrainz vocabulary and would
-mislead anyone who has not read their data model. The UI says album, and the export field
-is `musicbrainzId`. Code, schema and developer docs use the precise term.
+- **Country is the credited artist's,** then their area name, then nothing. Never fall
+  back to a pressing's country.
+- **`pick_release_group` only reorders hits tied on score.** Never filter by type, or EPs
+  and singles become unfindable.
+- **Refresh looks the stored group id up directly.** Only a release with no id is refreshed
+  by searching its artist and title.
+- **"Release group" never reaches the interface.** The UI says album and the export field
+  stays `musicbrainzId`. Code, schema and developer docs use the precise term.
 
 ### Export and import
 
-**The format is specified in [docs/export-format.md](docs/export-format.md).** It was
-written before either side existed, and it is the authority: where the document and
-`src-tauri/src/library/` disagree, the code is wrong.
+**The format is specified in [docs/export-format.md](docs/export-format.md)**, and it is
+the authority: where the document and `src-tauri/src/library/` disagree, the code is wrong.
+Why the format is shaped as it is: [ADR 0005](docs/adr/0005-library-export-format.md).
 
 `library/` decides what the bytes mean and touches neither SQL nor Tauri, so every decision
 about the format is testable without a database. `repo::releases::import_one` does the
 writing. The UI is one section of the Info view, driven by `useLibraryTransfer`.
 
-**A file carries no local row ids.** Identity on the way back in is the MusicBrainz
-release group id, exported as `musicbrainzId`, then artist and title case-insensitively.
-The second rule is a heuristic that can be wrong, which is why it lives in import, where
-the report makes the result visible, and not in `create()`.
+**Validate before any SQL runs.** Status, rating range and timestamp shapes are checked
+in `library/`, so a bad row is a reported rejection and never a database error. The import
+loop's error arm is for surprises, not the normal path.
 
-**Validation makes the database's constraints unreachable.** Status, rating range and the
-timestamp shapes are all checked before any SQL runs, so a bad row becomes a reported
-rejection rather than a SQL error. Keep it that way: the import loop's error arm exists for
-surprises, not as the normal path.
-
-**Native file dialogs come from `tauri-plugin-dialog`.** It is the only plugin in the
-build, and it costs 3.5 MB: the binary went from 4.2 MB to 7.7 MB when it was added, which
-is most of what fat LTO buys back. Rust writes and reads the file itself given a path, so
-no filesystem permission is granted to the webview.
+**Native file dialogs come from `tauri-plugin-dialog`, and Rust does the file I/O.** The
+webview gets a path from the dialog and nothing else; do not grant it filesystem
+permissions.
 
 **`releases_refresh_metadata` is the repair path.** Metadata is written once at add time
 and never revisited, so any improvement here only helps new additions until a user hits
@@ -239,6 +217,25 @@ have a human press the keys.
 **`@/api/` is the only place that imports Tauri.** `dialog.ts` wraps the file pickers for
 the same reason the others wrap `invoke`: the views and stores stay ordinary Vue and the
 seam stays one directory wide.
+
+**The content security policy is in `tauri.conf.json`, which cannot hold comments.**
+`img-src` allows any `https:` host on purpose, because a user can paste artwork from
+anywhere and an image is low risk. Scripts and connections stay locked to the app, which
+is where the risk is. `style-src 'unsafe-inline'` is required by PrimeVue. Any image URL
+the app stores must be `https`, or the policy blocks it silently; the Cover Art Archive
+returns `http://` and `resolve/coverart.rs` upgrades it.
+
+**`createWebHistory` works under Tauri.** A deep route resolves in a production build, so
+the common advice to switch Tauri apps to hash history does not apply here.
+
+**Fonts are bundled, never fetched.** Syne and Outfit come from `@fontsource` imports in
+`main.ts`. Do not add a Google Fonts `<link>`: the app would fall back to system fonts
+offline, the policy would have to open up, and a local-first app would contact a third
+party on every launch.
+
+**Queries use runtime `sqlx::query()`, not the `query!` macros.** The macros need a live
+database or a checked-in `.sqlx` cache at build time, and cannot check the filter queries,
+which are assembled at runtime. The integration tests catch a wrong column name instead.
 
 **`primeicons` is a separate package** and must stay listed in `package.json`.
 
