@@ -40,7 +40,7 @@
         >
           <Column field="albumArtUrl" header="" style="width: 60px">
             <template #body="{ data }">
-              <img v-if="data.albumArtUrl" :src="data.albumArtUrl" class="table-art" />
+              <img v-if="data.albumArtUrl" :src="coverSrc(data.albumArtUrl)" class="table-art" />
               <div v-else class="table-art-placeholder"><i class="pi pi-music" /></div>
             </template>
           </Column>
@@ -116,6 +116,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrc } from '@/api/cache'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import DataTable from 'primevue/datatable'

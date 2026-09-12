@@ -4,7 +4,7 @@
     <div v-if="releases.length" class="top-list">
       <div v-for="(r, i) in releases" :key="r.id" class="top-item">
         <span class="rank">{{ i + 1 }}</span>
-        <img v-if="r.albumArtUrl" :src="r.albumArtUrl" class="item-art" />
+        <img v-if="r.albumArtUrl" :src="coverSrc(r.albumArtUrl)" class="item-art" />
         <div class="item-info">
           <RouterLink :to="`/entry/${r.id}`" class="item-title">{{ r.artist }} – {{ r.title }}</RouterLink>
           <div class="item-meta">
@@ -19,6 +19,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrc } from '@/api/cache'
 import { RouterLink } from 'vue-router'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import type { Release } from '@/types'

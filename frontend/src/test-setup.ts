@@ -19,6 +19,11 @@ config.global.stubs = {
     props: ['modelValue', 'placeholder', 'fluid', 'required'],
     emits: ['update:modelValue']
   },
+  CountrySelect: {
+    template: '<select data-stub="country-select" :data-value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"></select>',
+    props: ['modelValue', 'fluid', 'placeholder'],
+    emits: ['update:modelValue']
+  },
   InputNumber: {
     template: '<input type="number" :value="modelValue" @input="$emit(\'update:modelValue\', Number($event.target.value))" />',
     props: ['modelValue', 'placeholder', 'min', 'max', 'useGrouping', 'fluid'],

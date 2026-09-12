@@ -95,6 +95,12 @@ One SQLite file:
 
 The Info view shows the exact path. Back it up by copying the file while the app is closed.
 
+Album covers are kept separately, in your system's cache folder, such as
+`~/.cache/cz.mtulek.trecker/covers` on Linux. Each one downloads the first time an album is
+shown, so the library looks the same offline after that. **Info → Cache** shows how much
+space they take and clears them, and they download again as albums are shown. It can also
+clear the temporary files kept by the browser engine the app runs in.
+
 ### Export and import
 
 **Info → Backup** writes your whole library to a file and reads one back.
@@ -176,9 +182,9 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 84 frontend tests
-npm run test:rust  # 109 Rust tests
-npm run test:net   # 8 tests against the live metadata services
+npm test           # 96 frontend tests
+npm run test:rust  # 124 Rust tests
+npm run test:net   # 9 tests against the live metadata services
 ```
 
 The Rust integration tests run against a real temporary SQLite file through the real
@@ -193,7 +199,7 @@ trecker/
 ├── frontend/                 Vue 3 application
 │   └── src/
 │       ├── api/              releases.ts, genres.ts, stats.ts, info.ts,
-│       │                     library.ts, dialog.ts
+│       │                     library.ts, dialog.ts, cache.ts
 │       │                     the only place that knows about Tauri
 │       ├── components/
 │       │   ├── layout/       AppLayout, AppSidebar
@@ -202,7 +208,7 @@ trecker/
 │       │   ├── release/      QuickAddBar, ReleaseCard, ReleaseForm,
 │       │   │                 QuickLogModal, GenreTagInput
 │       │   └── stats/        ActivityChart, BreakdownChart, TopRatedList, YearEndList
-│       ├── composables/      keyboard shortcuts, useLibraryTransfer
+│       ├── composables/      keyboard shortcuts, useLibraryTransfer, useCaches
 │       ├── stores/           releases.ts, genres.ts, stats.ts (Pinia)
 │       ├── types/index.ts    single source of truth for TS interfaces
 │       └── views/            QueueView, LibraryView, StatsView, EntryView, InfoView
@@ -211,6 +217,7 @@ trecker/
 │   ├── tauri.conf.json
 │   └── src/
 │       ├── commands.rs       the #[tauri::command] surface
+│       ├── covers.rs         cover cache, served through the cover: protocol
 │       ├── db.rs             pool, pragmas, migrations, diagnostics
 │       ├── domain.rs         wire types
 │       ├── error.rs          AppError → { code, message }
@@ -229,7 +236,7 @@ Art Archive are open, and everything else is local.
 
 ### Command surface
 
-Nineteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
+Twenty-two Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
 | Command | Purpose |
 |---|---|
@@ -252,6 +259,12 @@ Nineteen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `info_db` | Database path, size, schema version, pragmas |
 | `library_export` | Write the whole library to a JSON or CSV file |
 | `library_import` | Read one back, skipping or overwriting what matches |
+| `cache_covers_info` | Where cached covers live, how many, and their size |
+| `cache_covers_clear` | Delete cached covers; they download again when shown |
+| `cache_webview_clear` | Clear the webview's own cache and browser data |
+
+Covers are not commands. The webview requests them from the `cover:` protocol, which
+`covers.rs` serves from disk.
 
 `frontend/src/api/commands.test.ts` asserts every name and argument key, so a rename on
 either side of the boundary fails in CI rather than at runtime.

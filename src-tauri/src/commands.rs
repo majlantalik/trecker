@@ -305,3 +305,26 @@ pub async fn import_library(
     report.rejected.sort_by_key(|r| r.row);
     Ok(report)
 }
+
+// ---------------------------------------------------------------- caches
+
+#[tauri::command]
+pub async fn cache_covers_info(covers: State<'_, crate::covers::CoverCache>) -> AppResult<crate::covers::CoverCacheInfo> {
+    covers.info()
+}
+
+/// Returns what was removed. Covers download again as albums are shown.
+#[tauri::command]
+pub async fn cache_covers_clear(covers: State<'_, crate::covers::CoverCache>) -> AppResult<crate::covers::CoverCacheInfo> {
+    covers.clear()
+}
+
+/// Clears the webview's own stored data: its HTTP cache, and in principle cookies and
+/// browser storage. Safe because Trecker keeps nothing in browser storage. If that ever
+/// changes, this button starts wiping user settings. See `CLAUDE.md`.
+#[tauri::command]
+pub async fn cache_webview_clear(window: tauri::WebviewWindow) -> AppResult<()> {
+    window
+        .clear_all_browsing_data()
+        .map_err(|e| AppError::Internal(format!("could not clear webview data: {e}")))
+}

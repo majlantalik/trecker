@@ -28,7 +28,7 @@
         "script-src": "'self'",
         "style-src": "'self' 'unsafe-inline'",
         "font-src": "'self' data:",
-        "img-src": "'self' data: blob: https: asset: http://asset.localhost",
+        "img-src": "'self' data: blob: asset: http://asset.localhost cover: http://cover.localhost",
         "connect-src": "'self' ipc: http://ipc.localhost",
         "object-src": "'none'",
         "base-uri": "'self'",
@@ -38,7 +38,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "appimage"],
+    "targets": [
+      "deb",
+      "appimage"
+    ],
     "category": "Music",
     "shortDescription": "Personal music library and listening tracker",
     "longDescription": "Queue records you mean to hear, log them once you have, and see what you actually listened to. Everything is stored locally in a single SQLite file. Metadata comes from MusicBrainz and the Cover Art Archive; no account is required.",

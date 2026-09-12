@@ -86,6 +86,45 @@
 
     <div class="info-section">
       <div class="section-header">
+        <i class="pi pi-images section-icon" />
+        <h2 class="section-title">Cache</h2>
+      </div>
+      <div class="section-body">
+        <p class="stat-row">
+          <span class="stat-label">
+            Album covers
+            <span class="provider-note">{{ caches.info.value ? describeCovers(caches.info.value) : '…' }}</span>
+          </span>
+          <Button label="Clear" icon="pi pi-trash" size="small" outlined
+                  :disabled="caches.busy.value || !caches.info.value?.count"
+                  @click="caches.clearCovers()" />
+        </p>
+        <p class="form-hint">
+          Each cover is downloaded the first time an album is shown and kept on this machine,
+          so your library looks the same offline. Clearing frees the space, and covers
+          download again as albums are shown.
+        </p>
+
+        <p class="stat-row transfer-import">
+          <span class="stat-label">Web view data</span>
+          <Button label="Clear" icon="pi pi-trash" size="small" outlined
+                  :disabled="caches.busy.value" @click="caches.clearWebview()" />
+        </p>
+        <p class="form-hint">
+          Temporary files kept by the browser engine the app runs in. None of your library is
+          stored there, so clearing it loses nothing.
+        </p>
+
+        <p v-if="caches.error.value" class="db-error">{{ caches.error.value }}</p>
+        <p v-else-if="caches.message.value" class="transfer-result">
+          <i class="pi pi-check-circle" />
+          {{ caches.message.value }}
+        </p>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <div class="section-header">
         <i class="pi pi-search section-icon" />
         <h2 class="section-title">Metadata providers</h2>
       </div>
@@ -179,9 +218,12 @@ import Select from 'primevue/select'
 import { releasesApi } from '@/api/releases'
 import { infoApi } from '@/api/info'
 import { useLibraryTransfer } from '@/composables/useLibraryTransfer'
+import { useCaches, describeCovers } from '@/composables/useCaches'
+import { formatBytes } from '@/utils/bytes'
 import type { DbInfo, ImportMode } from '@/types'
 
 const transfer = useLibraryTransfer()
+const caches = useCaches()
 
 // Named for what happens to a release already in your library, because that is the only
 // thing the choice changes. There is no merge: see docs/export-format.md.
@@ -197,11 +239,6 @@ const counts = ref({ total: 0, queued: 0, listened: 0 })
 const db = ref<DbInfo | null>(null)
 const dbError = ref('')
 
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / 1024 / 1024).toFixed(1)} MB`
-}
 
 // Declared here rather than fetched: nothing is configurable, and a toggle that does
 // nothing would be worse than an honest label.
@@ -216,6 +253,8 @@ const providers = [
 ] as const
 
 onMounted(async () => {
+  caches.load()
+
   const [all, queued, listened] = await Promise.all([
     releasesApi.getAll({ size: 1 }),
     releasesApi.getAll({ size: 1, status: 'QUEUED' }),

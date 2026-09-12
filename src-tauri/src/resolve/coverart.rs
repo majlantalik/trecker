@@ -56,8 +56,9 @@ impl Resolver {
 }
 
 /// Prefers the image flagged as the front cover, then falls back to the first one.
-/// Thumbnails are tried 500 before 250 before 1200: 500 is the size the card grid
-/// actually displays, and pulling 1200 for a 160px card wastes the user's bandwidth.
+/// Thumbnails are tried 250 before 500 before 1200. No cover is shown larger than 260px,
+/// and 250px is a third the size of 500px, which matters because every cover is kept on
+/// disk by `covers.rs`.
 fn pick_image(body: &Value) -> Option<String> {
     let images = body.get("images")?.as_array()?;
     if images.is_empty() {
@@ -70,7 +71,7 @@ fn pick_image(body: &Value) -> Option<String> {
         .or_else(|| images.first())?;
 
     if let Some(thumbnails) = chosen.get("thumbnails") {
-        for size in ["500", "250", "1200"] {
+        for size in ["250", "500", "1200"] {
             if let Some(url) = thumbnails.get(size).and_then(Value::as_str) {
                 return Some(https(url));
             }
@@ -111,12 +112,12 @@ mod tests {
     }
 
     #[test]
-    fn prefers_500_then_250_then_1200() {
+    fn prefers_250_then_500_then_1200() {
         let all = json!({"images": [{"front": true, "thumbnails": {"250": "a", "500": "b", "1200": "c"}}]});
-        assert_eq!(pick_image(&all).as_deref(), Some("b"));
+        assert_eq!(pick_image(&all).as_deref(), Some("a"));
 
-        let no_500 = json!({"images": [{"front": true, "thumbnails": {"250": "a", "1200": "c"}}]});
-        assert_eq!(pick_image(&no_500).as_deref(), Some("a"));
+        let no_250 = json!({"images": [{"front": true, "thumbnails": {"500": "b", "1200": "c"}}]});
+        assert_eq!(pick_image(&no_250).as_deref(), Some("b"));
 
         let only_large = json!({"images": [{"front": true, "thumbnails": {"1200": "c"}}]});
         assert_eq!(pick_image(&only_large).as_deref(), Some("c"));

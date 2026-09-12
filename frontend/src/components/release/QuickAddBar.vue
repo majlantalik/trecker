@@ -21,7 +21,7 @@
       >
         <template #option="{ option }">
           <div class="catalog-suggestion">
-            <img v-if="option.albumArtUrl" :src="option.albumArtUrl" class="suggestion-art" alt="" />
+            <img v-if="option.albumArtUrl" :src="coverSrc(option.albumArtUrl)" class="suggestion-art" alt="" />
             <div v-else class="suggestion-art-placeholder"><i class="pi pi-music" /></div>
             <span class="suggestion-label">
               {{ option.artist }} &mdash; {{ option.title }}
@@ -60,6 +60,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrc } from '@/api/cache'
 import { ref, watch, onUnmounted } from 'vue'
 import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'

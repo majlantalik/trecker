@@ -27,21 +27,10 @@
       <div class="hero-inner">
         <!-- Album art -->
         <div class="hero-art">
-          <div class="art-wrapper" @click="startEdit('albumArtUrl', release.albumArtUrl ?? '')">
-            <img v-if="release.albumArtUrl" :src="release.albumArtUrl" :alt="`${release.artist} – ${release.title}`" />
+          <!-- Not editable. The cover comes from the metadata lookup, and refresh replaces it. -->
+          <div class="art-wrapper">
+            <img v-if="release.albumArtUrl" :src="coverSrc(release.albumArtUrl)" :alt="`${release.artist} – ${release.title}`" />
             <div v-else class="art-placeholder"><i class="pi pi-music" /></div>
-            <div class="art-overlay"><i class="pi pi-pencil" /></div>
-          </div>
-          <div v-if="editingField === 'albumArtUrl'" class="art-url-edit">
-            <InputText
-              v-focus
-              v-model="draft"
-              placeholder="Paste image URL..."
-              fluid
-              @blur="saveField('albumArtUrl', draft)"
-              @keydown.enter="saveField('albumArtUrl', draft)"
-              @keydown.escape="cancelEdit"
-            />
           </div>
         </div>
 
@@ -121,19 +110,20 @@
             <span
               v-if="editingField !== 'country'"
               class="meta-pill editable"
-              @click="startEdit('country', release.country ?? '')"
+              @click="startCountryEdit"
             >
               <CountryLabel v-if="release.country" :value="release.country" />
               <template v-else>add country</template>
             </span>
-            <InputText
+            <!-- Picking saves at once. Closing the list without a pick, by Escape or a click
+                 elsewhere, cancels, unless the close is the one that follows a pick. -->
+            <CountrySelect
               v-else
-              v-focus
-              v-model="draft"
-              style="width: 90px; font-size: 0.85rem;"
-              @blur="saveField('country', draft)"
-              @keydown.enter="saveField('country', draft)"
-              @keydown.escape="cancelEdit"
+              ref="countrySelect"
+              :model-value="release.country"
+              class="country-edit"
+              @update:model-value="(v: string | null) => v && saveField('country', v)"
+              @hide="savingField !== 'country' && cancelEdit()"
             />
 
             <!-- Date listened -->
@@ -244,7 +234,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { coverSrc } from '@/api/cache'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -259,6 +250,7 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import CountryLabel from '@/components/common/CountryLabel.vue'
+import CountrySelect from '@/components/common/CountrySelect.vue'
 import QuickLogModal from '@/components/release/QuickLogModal.vue'
 import GenreTagInput from '@/components/release/GenreTagInput.vue'
 import { releasesApi } from '@/api/releases'
@@ -359,6 +351,16 @@ function onLogged(updated: Release) {
 function startEdit(field: string, value: any) {
   editingField.value = field
   draft.value = value
+}
+
+const countrySelect = ref<InstanceType<typeof CountrySelect> | null>(null)
+
+// The pill turns into the picker already open, so editing a country is one click to open
+// and one to choose, not a click on a pill and then another on a dropdown.
+async function startCountryEdit() {
+  startEdit('country', release.value?.country ?? '')
+  await nextTick()
+  countrySelect.value?.open()
 }
 
 function cancelEdit() {
@@ -509,7 +511,6 @@ function capitalize(s: string) {
 
 .art-wrapper {
   position: relative;
-  cursor: pointer;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -530,27 +531,6 @@ function capitalize(s: string) {
   justify-content: center;
   font-size: 3rem;
   color: rgba(226, 228, 240, 0.2);
-}
-
-.art-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.15s;
-  font-size: 1.4rem;
-  color: var(--tk-text);
-}
-
-.art-wrapper:hover .art-overlay {
-  opacity: 1;
-}
-
-.art-url-edit {
-  margin-top: 0.1rem;
 }
 
 /* ─── Info column ─── */
@@ -824,5 +804,10 @@ function capitalize(s: string) {
   justify-content: center;
   padding: 4rem;
   gap: 1rem;
+}
+
+.country-edit {
+  min-width: 13rem;
+  font-size: 0.85rem;
 }
 </style>

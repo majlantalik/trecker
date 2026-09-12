@@ -137,3 +137,9 @@ export interface ImportReport {
   skipped: number
   rejected: RejectedRow[]
 }
+
+export interface CoverCacheInfo {
+  path: string
+  count: number
+  sizeBytes: number
+}

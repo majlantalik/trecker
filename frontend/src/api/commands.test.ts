@@ -4,13 +4,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 // the Rust side in src-tauri/src/commands.rs must keep these names and argument keys, so
 // a rename on either side fails here rather than silently at runtime.
 const invoke = vi.fn()
-vi.mock('@tauri-apps/api/core', () => ({ invoke }))
+const convertFileSrc = vi.fn((path: string, protocol: string) => `${protocol}://localhost/${encodeURIComponent(path)}`)
+vi.mock('@tauri-apps/api/core', () => ({ invoke, convertFileSrc }))
 
 const { releasesApi } = await import('./releases')
 const { genresApi, countriesApi } = await import('./genres')
 const { statsApi } = await import('./stats')
 const { infoApi } = await import('./info')
 const { libraryApi } = await import('./library')
+const { cacheApi, coverSrc } = await import('./cache')
 
 beforeEach(() => {
   invoke.mockReset()
@@ -137,6 +139,34 @@ describe('library commands', () => {
       path: '/home/me/library.csv',
       mode: 'overwrite'
     })
+  })
+})
+
+describe('cache commands', () => {
+  it('maps each call to its command, with no arguments', async () => {
+    await cacheApi.covers()
+    expect(invoke).toHaveBeenCalledWith('cache_covers_info')
+
+    await cacheApi.clearCovers()
+    expect(invoke).toHaveBeenCalledWith('cache_covers_clear')
+
+    await cacheApi.clearWebview()
+    expect(invoke).toHaveBeenCalledWith('cache_webview_clear')
+  })
+})
+
+describe('coverSrc', () => {
+  it('routes a stored URL through the cover protocol', () => {
+    // The scheme must match `covers::SCHEME` in src-tauri/src/covers.rs.
+    const url = 'https://coverartarchive.org/release/x/1-250.jpg'
+    expect(coverSrc(url)).toBe(`cover://localhost/${encodeURIComponent(url)}`)
+    expect(convertFileSrc).toHaveBeenCalledWith(url, 'cover')
+  })
+
+  it('gives no address for a release without a cover', () => {
+    expect(coverSrc(null)).toBeUndefined()
+    expect(coverSrc(undefined)).toBeUndefined()
+    expect(coverSrc('')).toBeUndefined()
   })
 })
 

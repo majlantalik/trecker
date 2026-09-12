@@ -72,12 +72,8 @@ describe('QuickLogModal', () => {
     await wrapper.setProps({ release })
     await flushPromises()
 
-    // The form should have the release's country value.
-    // Stubs render InputText as <input :value="modelValue" />, country is the first text input.
-    const inputs = wrapper.findAll('input')
-    const textInputs = inputs.filter(i => (i.element as HTMLInputElement).type !== 'checkbox')
-    // textInputs[0] = country input (first InputText in the form)
-    expect(textInputs[0].element.value).toBe('US')
+    // The form should have the release's country value, handed to the country picker.
+    expect(wrapper.find('[data-stub="country-select"]').attributes('data-value')).toBe('US')
   })
 
   it('"Log it" button emits logged event and calls markAsListened', async () => {

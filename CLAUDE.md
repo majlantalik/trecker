@@ -23,7 +23,7 @@ npm run build:fast     # debug .deb, for when you need something installable now
 npm run build:nobundle # binary only
 npm test               # frontend tests
 npm run test:rust      # Rust tests
-npm run test:net       # the eight network tests, excluded from test:rust
+npm run test:net       # the nine network tests, excluded from test:rust
 ```
 
 ### Build times
@@ -57,11 +57,11 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-109 Rust tests and 84 frontend tests. The Rust integration tests in
+124 Rust tests and 96 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
-Eight further tests hit the live MusicBrainz and Cover Art Archive services and are
+Nine further tests hit the live MusicBrainz and Cover Art Archive services and are
 excluded from normal runs. `npm run test:net` runs them, and passes `--test-threads=1`,
 which is required: the MusicBrainz rate limiter lives on the `Resolver`, each test builds
 its own, and parallel runs trip the limit and get a 503.
@@ -76,7 +76,8 @@ frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api
 src-tauri/    The Rust core.
   migrations/ sqlx migrations, replacing Liquibase
   src/
-    commands.rs   the #[tauri::command] surface, 19 commands
+    commands.rs   the #[tauri::command] surface, 22 commands
+    covers.rs     the on-disk cover cache and the cover: protocol
     db.rs         pool, pragmas, migration runner, DbInfo diagnostics
     domain.rs     wire types, mirroring frontend/src/types/index.ts
     error.rs      AppError, serialized to the frontend as { code, message }
@@ -139,6 +140,25 @@ The rules that follow:
   by searching its artist and title.
 - **"Release group" never reaches the interface.** The UI says album and the export field
   stays `musicbrainzId`. Code, schema and developer docs use the precise term.
+
+### Album covers
+
+**Never bind a stored `albumArtUrl` to an image directly. Use `coverSrc()` from
+`@/api/cache`.** It routes the URL through the `cover:` protocol, which `covers.rs` answers
+from `app_cache_dir()/covers`, downloading on the first request. `img-src` has no `https:`,
+so a direct binding does not load at all. `frontend/src/api/covers.guard.test.ts` scans
+every `.vue` file for one.
+
+- **The stored URL stays the source of truth.** Exports carry it and refresh replaces it.
+  The cache is derived and safe to delete at any time, which the Info view does.
+- **Covers are fetched at 250px.** The resolver prefers the Cover Art Archive's 250px
+  thumbnail, and the cache rewrites stored 500px and 1200px archive URLs to 250px, falling
+  back to the stored URL.
+- **Only `https` URLs are fetched, and only images are kept.** The type is sniffed from the
+  bytes, so an error page served with status 200 is never cached. Files over 5 MB are
+  refused.
+- **Cache file names are FNV-1a hashes** of `250:` plus the URL. Do not swap in std's
+  `DefaultHasher`: its algorithm may change between Rust releases and orphan the cache.
 
 ### Export and import
 
@@ -219,11 +239,15 @@ the same reason the others wrap `invoke`: the views and stores stay ordinary Vue
 seam stays one directory wide.
 
 **The content security policy is in `tauri.conf.json`, which cannot hold comments.**
-`img-src` allows any `https:` host on purpose, because a user can paste artwork from
-anywhere and an image is low risk. Scripts and connections stay locked to the app, which
-is where the risk is. `style-src 'unsafe-inline'` is required by PrimeVue. Any image URL
-the app stores must be `https`, or the policy blocks it silently; the Cover Art Archive
-returns `http://` and `resolve/coverart.rs` upgrades it.
+Nothing the webview loads comes from the network. `img-src` allows `cover:` and
+`http://cover.localhost`, the Windows form of the same scheme, and no remote host, so every
+cover goes through the cache. Scripts and connections stay locked to the app.
+`style-src 'unsafe-inline'` is required by PrimeVue.
+
+**Clearing webview data wipes browser storage too.** The Info view's button calls
+`clear_all_browsing_data`, which removes the HTTP cache along with cookies, `localStorage`
+and IndexedDB. That is harmless only because Trecker uses none of them. If anything starts
+keeping state in browser storage, change that button before shipping.
 
 **`createWebHistory` works under Tauri.** A deep route resolves in a production build, so
 the common advice to switch Tauri apps to hash history does not apply here.

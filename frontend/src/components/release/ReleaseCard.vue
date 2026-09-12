@@ -1,7 +1,7 @@
 <template>
   <div class="release-card" @click="$emit('click', release)">
     <div class="card-art">
-      <img v-if="release.albumArtUrl" :src="release.albumArtUrl" :alt="`${release.artist} - ${release.title}`" />
+      <img v-if="release.albumArtUrl" :src="coverSrc(release.albumArtUrl)" :alt="`${release.artist} - ${release.title}`" />
       <div v-else class="art-placeholder">
         <i class="pi pi-music" />
       </div>
@@ -27,6 +27,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrc } from '@/api/cache'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import CountryLabel from '@/components/common/CountryLabel.vue'
 import Tag from 'primevue/tag'

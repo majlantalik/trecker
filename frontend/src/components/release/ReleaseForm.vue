@@ -42,7 +42,7 @@
       </div>
 
       <div class="form-field" v-if="form.albumArtUrl">
-        <img :src="form.albumArtUrl" class="album-art-preview" alt="Album art" />
+        <img :src="coverSrc(form.albumArtUrl)" class="album-art-preview" alt="Album art" />
       </div>
 
       <div class="form-actions">
@@ -54,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrc } from '@/api/cache'
 import { ref, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'

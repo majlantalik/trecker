@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { countryFlag, countryName } from './country'
+import { countryFlag, countryName, COUNTRY_CODES, countryOptions } from './country'
 
 describe('countryFlag', () => {
   it('builds flags from regional indicator symbols', () => {
@@ -58,5 +58,48 @@ describe('countryName', () => {
 
   it('trims surrounding whitespace', () => {
     expect(countryName('  US  ')).toBe('United States')
+  })
+})
+
+describe('COUNTRY_CODES', () => {
+  it('holds the 249 ISO 3166-1 countries plus Kosovo, once each', () => {
+    expect(COUNTRY_CODES).toHaveLength(250)
+    expect(new Set(COUNTRY_CODES).size).toBe(250)
+    expect(COUNTRY_CODES).toContain('XK')
+  })
+
+  it('holds only two-letter codes the platform can name', () => {
+    for (const code of COUNTRY_CODES) {
+      expect(code).toMatch(/^[A-Z]{2}$/)
+      expect(countryName(code), code).not.toBe(code)
+    }
+  })
+
+  it('leaves out historical states and reserved codes', () => {
+    // The platform still names these, which is why the list is not generated from it.
+    for (const code of ['UK', 'SU', 'YU', 'RH', 'EU', 'UN', 'ZZ']) {
+      expect(COUNTRY_CODES).not.toContain(code)
+    }
+  })
+})
+
+describe('countryOptions', () => {
+  it('sorts by name, not by code', () => {
+    const labels = countryOptions().map((o) => o.label)
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)))
+    // Germany is DE and Denmark is DK, but by name Denmark comes first.
+    expect(labels.indexOf('Denmark')).toBeLessThan(labels.indexOf('Germany'))
+  })
+
+  it('does not duplicate a current value that is already on the list', () => {
+    expect(countryOptions('US')).toHaveLength(COUNTRY_CODES.length)
+    expect(countryOptions('us')).toHaveLength(COUNTRY_CODES.length)
+  })
+
+  it('keeps a current value that is not on the list, first', () => {
+    // From MusicBrainz: a dissolved state's code, and an area name with no ISO code.
+    expect(countryOptions('SU')[0].value).toBe('SU')
+    expect(countryOptions('England')[0]).toEqual({ value: 'England', label: 'England' })
+    expect(countryOptions('England')).toHaveLength(COUNTRY_CODES.length + 1)
   })
 })
