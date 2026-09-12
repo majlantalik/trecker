@@ -126,6 +126,31 @@ describe('releases store', () => {
     expect(store.listenedReleases.map(r => r.id)).toEqual(['2', '3'])
   })
 
+  it('queuedTotal is independent of the list total', async () => {
+    // The bug this covers: the sidebar badge read `total`, which belongs to whatever list
+    // was fetched last, so it showed the Library count next to the word "Queue".
+    mockReleasesApi.getAll.mockResolvedValueOnce(makePage([makeRelease({ status: 'QUEUED' })]))
+    const store = useReleasesStore()
+    await store.refreshQueuedCount()
+    expect(store.queuedTotal).toBe(1)
+
+    // Now load a Library page of three. The badge must not follow it.
+    mockReleasesApi.getAll.mockResolvedValueOnce(
+      makePage([makeRelease({ id: 'a' }), makeRelease({ id: 'b' }), makeRelease({ id: 'c' })])
+    )
+    await store.fetchReleases({ status: 'LISTENED' })
+
+    expect(store.total).toBe(3)
+    expect(store.queuedTotal).toBe(1)
+  })
+
+  it('refreshQueuedCount asks only for queued releases', async () => {
+    mockReleasesApi.getAll.mockResolvedValue(makePage([]))
+    const store = useReleasesStore()
+    await store.refreshQueuedCount()
+    expect(mockReleasesApi.getAll).toHaveBeenCalledWith({ status: 'QUEUED', size: 1 })
+  })
+
   it('setFilters merges new filters and resets page to 0', () => {
     const store = useReleasesStore()
     store.currentPage = 3

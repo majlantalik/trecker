@@ -1,29 +1,24 @@
-import api from './axios'
+import { invoke } from '@tauri-apps/api/core'
 import type { ActivityDataPoint, BreakdownItem, Release, YearEndEntry } from '@/types'
 
 export const statsApi = {
   async getActivity(): Promise<ActivityDataPoint[]> {
-    const { data } = await api.get<ActivityDataPoint[]>('/stats/activity')
-    return data
+    return invoke<ActivityDataPoint[]>('stats_activity')
   },
 
   async getByGenre(): Promise<BreakdownItem[]> {
-    const { data } = await api.get<BreakdownItem[]>('/stats/by-genre')
-    return data
+    return invoke<BreakdownItem[]>('stats_by_genre')
   },
 
   async getByCountry(): Promise<BreakdownItem[]> {
-    const { data } = await api.get<BreakdownItem[]>('/stats/by-country')
-    return data
+    return invoke<BreakdownItem[]>('stats_by_country')
   },
 
   async getTopRated(limit = 25): Promise<Release[]> {
-    const { data } = await api.get<Release[]>('/stats/top-rated', { params: { limit } })
-    return data
+    return invoke<Release[]>('stats_top_rated', { limit })
   },
 
   async getYearEnd(year?: number): Promise<YearEndEntry[]> {
-    const { data } = await api.get<YearEndEntry[]>('/stats/year-end', { params: { year } })
-    return data
+    return invoke<YearEndEntry[]>('stats_year_end', { year })
   }
 }

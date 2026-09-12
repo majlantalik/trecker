@@ -1,21 +1,14 @@
 <template>
-  <template v-if="route.meta.public">
+  <AppLayout>
     <RouterView />
-  </template>
-  <template v-else>
-    <AppLayout>
-      <RouterView />
-    </AppLayout>
-  </template>
+  </AppLayout>
   <Toast position="bottom-right" />
 </template>
 
 <script setup lang="ts">
-import { useRoute, RouterView } from 'vue-router'
+import { RouterView } from 'vue-router'
 import Toast from 'primevue/toast'
 import AppLayout from '@/components/layout/AppLayout.vue'
-
-const route = useRoute()
 </script>
 
 <style>

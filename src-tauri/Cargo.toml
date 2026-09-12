@@ -1,0 +1,46 @@
+[package]
+name = "trecker"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+description = "Local-first music listening tracker"
+authors = ["mtulek"]
+
+[lib]
+name = "trecker_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
+# rustls rather than native-tls: no OpenSSL to find at build time and none to ship,
+# which matters for a binary that has to build on three platforms.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "tls-none",
+    "sqlite",
+    "migrate",
+    "macros",
+] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tempfile = "3"
+
+# Fat LTO in a single codegen unit: the slowest configuration to build and the smallest
+# binary, 4.2 MB against 8.2 MB for thin LTO across 16 units. Worth it because release
+# builds happen once per release and the dev loop does not use this profile at all.
+# Measured on 24 cores, one-line change: 74 s here, 23 s thin, 5.5 s dev.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

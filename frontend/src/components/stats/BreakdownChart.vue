@@ -16,13 +16,25 @@ import {
   Legend
 } from 'chart.js'
 import type { BreakdownItem } from '@/types'
+import { countryFlag, countryName } from '@/utils/country'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
-const props = defineProps<{
-  title: string
-  data: BreakdownItem[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    title: string
+    data: BreakdownItem[]
+    /** Labels arrive as ISO country codes; render them as names in the legend. */
+    labelAs?: 'raw' | 'country'
+  }>(),
+  { labelAs: 'raw' }
+)
+
+function label(value: string) {
+  if (props.labelAs !== 'country') return value
+  const flag = countryFlag(value)
+  return flag ? `${flag} ${countryName(value)}` : countryName(value)
+}
 
 const COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
@@ -33,7 +45,7 @@ const chartData = computed(() => {
   if (!props.data.length) return null
   const top = props.data.slice(0, 10)
   return {
-    labels: top.map(d => d.label),
+    labels: top.map(d => label(d.label)),
     datasets: [{
       data: top.map(d => d.count),
       backgroundColor: COLORS.slice(0, top.length),

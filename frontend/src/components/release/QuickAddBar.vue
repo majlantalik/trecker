@@ -1,8 +1,9 @@
 <template>
-  <div class="quick-add-bar">
+  <div class="quick-add-bar" :class="{ 'is-palette': palette }">
     <div class="input-wrapper">
       <i class="pi pi-plus-circle input-icon" />
       <AutoComplete
+        ref="acRef"
         class="quick-add-ac"
         v-model="acValue"
         :suggestions="suggestions"
@@ -15,7 +16,7 @@
           option: { style: 'padding: 0.4rem 0.875rem;' }
         }"
         option-label="title"
-        placeholder="Paste a Spotify/Tidal link or type an artist + album..."
+        :placeholder="palette ? 'Type an artist and album, then press Enter...' : 'Type an artist and album, or paste a link...'"
         auto-highlight
       >
         <template #option="{ option }">
@@ -42,6 +43,7 @@
     </div>
 
     <Button
+      v-if="!palette"
       label="Add"
       icon="pi pi-search"
       :loading="resolving"
@@ -68,6 +70,16 @@ import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
 import type { ResolvedMetadata } from '@/types'
 
+const props = withDefaults(
+  defineProps<{
+    /** Rendered inside the Shift-Shift palette rather than the header bar. */
+    palette?: boolean
+  }>(),
+  { palette: false }
+)
+
+const emit = defineEmits<{ added: []; resolving: [value: boolean] }>()
+
 const acValue = ref<string | ResolvedMetadata>('')
 const inputValue = ref('')
 const suggestions = ref<ResolvedMetadata[]>([])
@@ -77,6 +89,15 @@ const resolvedMetadata = ref<ResolvedMetadata | null>(null)
 const toast = useToast()
 const releasesStore = useReleasesStore()
 const genresStore = useGenresStore()
+
+const acRef = ref<{ $el: HTMLElement } | null>(null)
+
+/** Focuses the text field. The palette calls this once its dialog has mounted. */
+function focus() {
+  const input = acRef.value?.$el?.querySelector('input')
+  input?.focus()
+}
+defineExpose({ focus })
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -180,6 +201,7 @@ async function handleFormSubmit(data: any) {
     })
     clearInput()
     resolvedMetadata.value = null
+    emit('added')
   } catch (e: any) {
     toast.add({
       severity: 'error',

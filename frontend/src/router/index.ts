@@ -1,24 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 
+// History mode is kept deliberately. Tauri's asset protocol falls back to index.html for
+// unmatched paths, verified against a production build in the Phase 0 spike, so the usual
+// advice to switch to hash history for Tauri does not apply here.
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
       redirect: '/queue'
-    },
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('@/views/LoginView.vue'),
-      meta: { public: true }
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/views/RegisterView.vue'),
-      meta: { public: true }
     },
     {
       path: '/queue',
@@ -42,23 +32,11 @@ const router = createRouter({
       props: true
     },
     {
-      path: '/profile',
-      name: 'profile',
-      component: () => import('@/views/ProfileView.vue')
+      path: '/info',
+      name: 'info',
+      component: () => import('@/views/InfoView.vue')
     }
   ]
-})
-
-router.beforeEach(async (to) => {
-  const authStore = useAuthStore()
-
-  if (!to.meta.public && !authStore.isAuthenticated) {
-    return { path: '/login', query: { redirect: to.fullPath } }
-  }
-
-  if (to.meta.public && authStore.isAuthenticated) {
-    return { path: '/queue' }
-  }
 })
 
 export default router

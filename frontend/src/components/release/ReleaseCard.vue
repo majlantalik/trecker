@@ -11,7 +11,7 @@
       <div class="card-artist">{{ release.artist }}</div>
       <div class="card-meta">
         <span v-if="release.releaseYear" class="meta-item">{{ release.releaseYear }}</span>
-        <span v-if="release.country" class="meta-item">{{ release.country }}</span>
+        <CountryLabel v-if="release.country" :value="release.country" compact class="meta-item" />
       </div>
       <div class="card-genres" v-if="release.genres.length">
         <Tag v-for="genre in release.genres.slice(0, 3)" :key="genre" :value="genre" severity="secondary" />
@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
+import CountryLabel from '@/components/common/CountryLabel.vue'
 import Tag from 'primevue/tag'
 import type { Release } from '@/types'
 

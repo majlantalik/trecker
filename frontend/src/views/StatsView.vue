@@ -17,7 +17,7 @@
         <BreakdownChart title="By Genre" :data="statsStore.byGenre" />
       </div>
       <div class="stats-col">
-        <BreakdownChart title="By Country" :data="statsStore.byCountry" />
+        <BreakdownChart title="By Country" :data="statsStore.byCountry" label-as="country" />
       </div>
 
       <div class="stats-full">

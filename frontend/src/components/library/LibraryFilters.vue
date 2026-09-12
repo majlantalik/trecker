@@ -57,7 +57,26 @@
             <i class="pi pi-globe" />
             Country
           </label>
-          <InputText v-model="localFilters.country" placeholder="e.g. US, GB" fluid @input="debouncedEmit" />
+          <Select
+            v-model="localFilters.country"
+            :options="countryOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="All"
+            :filter="countryOptions.length > 8"
+            filter-placeholder="Find a country..."
+            show-clear
+            fluid
+            @change="emit"
+          >
+            <template #value="{ value, placeholder }">
+              <CountryLabel v-if="value" :value="value" />
+              <span v-else>{{ placeholder }}</span>
+            </template>
+            <template #option="{ option }">
+              <CountryLabel :value="option.value" />
+            </template>
+          </Select>
         </div>
 
         <div class="filter-item">
@@ -104,7 +123,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
@@ -112,6 +131,9 @@ import AutoComplete from 'primevue/autocomplete'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import Checkbox from 'primevue/checkbox'
 import { useGenresStore } from '@/stores/genres'
+import CountryLabel from '@/components/common/CountryLabel.vue'
+import { countriesApi } from '@/api/genres'
+import { countryName } from '@/utils/country'
 import type { ReleaseFilterParams } from '@/types'
 
 const props = defineProps<{
@@ -178,8 +200,23 @@ function searchGenre(event: { query: string }) {
   filteredGenres.value = genresStore.genres.filter(g => g.toLowerCase().includes(q))
 }
 
-onMounted(() => {
+// Only the countries actually in the library. Offering all 250 would mean scrolling past
+// 240 that can only ever return nothing. Sorted by the name shown, not the stored code,
+// so the list reads alphabetically rather than by two-letter code.
+const countries = ref<string[]>([])
+const countryOptions = computed(() =>
+  countries.value
+    .map((value) => ({ value, label: countryName(value) }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+)
+
+onMounted(async () => {
   genresStore.fetchGenres()
+  try {
+    countries.value = await countriesApi.getAll()
+  } catch {
+    // An empty list just means no country filter; not worth an error.
+  }
   if (props.initialGenre) {
     localFilters.value.genre = props.initialGenre
   }
