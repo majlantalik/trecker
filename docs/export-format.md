@@ -26,14 +26,18 @@ them would invite an importer to trust them.
 A release is matched against the existing library in this order, stopping at the first hit:
 
 1. `musicbrainzId`, when both sides have one
-2. `spotifyId`, when both sides have one
-3. `artist` and `title`, compared case-insensitively after trimming
+2. `artist` and `title`, compared case-insensitively after trimming
 
-This is deliberately the same precedence `repo::releases::create` already uses to dedupe
-the catalog, so import reuses logic that is already tested rather than inventing a second
-notion of sameness.
+This mirrors the precedence `repo::releases::create` already uses to dedupe the catalog,
+minus the Spotify step, so import reuses logic that is already tested rather than
+inventing a second notion of sameness.
 
-The third rule is a heuristic and can be wrong: two genuinely different releases with the
+There is no `spotifyId` in this format. The column exists in the schema and the dedup
+still checks it, but nothing has written one since Spotify became link-only: the resolver
+returns null unconditionally. Exporting a field that is null in every row of every library
+would be inviting a future importer to depend on it.
+
+The second rule is a heuristic and can be wrong: two genuinely different releases with the
 same artist and title and no external ids will be treated as one. That is rare, it only
 applies to hand-entered rows, and the alternative, refusing to match without an external
 id, would duplicate most of a library on re-import. Import reports what it matched so the
@@ -58,7 +62,6 @@ The canonical format. One file, one object.
       "country": "US",
       "albumArtUrl": "https://coverartarchive.org/release/266e8eb6-.../19590732868-500.jpg",
       "musicbrainzId": "266e8eb6-244f-450d-b419-7e3cdf815d4c",
-      "spotifyId": null,
       "genres": ["alternative rock", "rock"],
       "streamingLinks": { "spotify": "https://open.spotify.com/album/..." },
       "status": "LISTENED",
@@ -93,7 +96,6 @@ which is worth catching before writing anything.
 | `country` | string or null | ISO 3166-1 alpha-2, or a free-text area name |
 | `albumArtUrl` | string or null | A URL, not the image. See below. |
 | `musicbrainzId` | string or null | Match key |
-| `spotifyId` | string or null | Match key |
 | `genres` | array of strings | Sorted, may be empty |
 | `streamingLinks` | object | Service name to URL, may be empty |
 | `status` | `"QUEUED"` or `"LISTENED"` | |
@@ -135,6 +137,7 @@ rejected.
 ## What is not exported
 
 - **Local row ids**, for the reason above.
+- **`spotifyId`**, which is null in every row and has been since Phase 4.
 - **The local user id.** A sentinel with one value; sync would assign a real one.
 - **Catalog rows you no longer track.** Deleting a release keeps its catalog entry, which
   is an implementation detail of the two-table split, not part of your library.
