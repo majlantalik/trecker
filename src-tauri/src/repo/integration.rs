@@ -96,13 +96,13 @@ async fn dedupes_catalog_on_external_id() {
     let (_d, pool) = fresh().await;
 
     let mut first = req("Slint", "Spiderland");
-    first.spotify_id = Some("spid-1".into());
+    first.musicbrainz_id = Some("mbid-1".into());
     let a = releases::create(&pool, first).await.unwrap();
 
-    // Same Spotify id, different spelling of the title: it is the same album, so the
+    // Same MusicBrainz id, different spelling of the title: it is the same album, so the
     // catalog row must be reused rather than duplicated.
     let mut second = req("Slint", "Spiderland (Remaster)");
-    second.spotify_id = Some("spid-1".into());
+    second.musicbrainz_id = Some("mbid-1".into());
     let b = releases::create(&pool, second).await.unwrap();
 
     assert_eq!(a.id, b.id, "same catalog row");
@@ -122,16 +122,14 @@ async fn dedupes_catalog_on_external_id() {
 }
 
 #[tokio::test]
-async fn dedupe_falls_through_to_musicbrainz_id() {
+async fn releases_without_an_external_id_are_never_merged() {
+    // Two records with no MusicBrainz id are two releases, however similar they look.
+    // Guessing that identical text means an identical album belongs in import, where the
+    // user can see the result, not silently inside create().
     let (_d, pool) = fresh().await;
-    let mut first = req("Talk Talk", "Laughing Stock");
-    first.musicbrainz_id = Some("mb-1".into());
-    let a = releases::create(&pool, first).await.unwrap();
-
-    let mut second = req("Talk Talk", "Laughing Stock");
-    second.musicbrainz_id = Some("mb-1".into());
-    let b = releases::create(&pool, second).await.unwrap();
-    assert_eq!(a.id, b.id);
+    let a = releases::create(&pool, req("Various", "Untitled")).await.unwrap();
+    let b = releases::create(&pool, req("Various", "Untitled")).await.unwrap();
+    assert_ne!(a.id, b.id);
 }
 
 #[tokio::test]
@@ -139,10 +137,9 @@ async fn blank_external_ids_do_not_collide() {
     // Empty strings would collide on the UNIQUE constraint; NULL does not collide.
     let (_d, pool) = fresh().await;
     let mut a = req("A", "One");
-    a.spotify_id = Some("".into());
     a.musicbrainz_id = Some("   ".into());
     let mut b = req("B", "Two");
-    b.spotify_id = Some("".into());
+    b.musicbrainz_id = Some("".into());
 
     let ra = releases::create(&pool, a).await.unwrap();
     let rb = releases::create(&pool, b).await.unwrap();

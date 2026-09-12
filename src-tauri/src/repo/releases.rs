@@ -94,7 +94,7 @@ pub async fn create(pool: &SqlitePool, req: ReleaseRequest) -> AppResult<Release
     let stamp = now();
 
     // Find-or-create the catalog row, exactly as ReleaseService.create does.
-    let existing = find_catalog(&mut *tx, req.spotify_id.as_deref(), req.musicbrainz_id.as_deref()).await?;
+    let existing = find_catalog(&mut *tx, req.musicbrainz_id.as_deref()).await?;
 
     let release_id = match existing {
         Some(id) => id,
@@ -105,7 +105,7 @@ pub async fn create(pool: &SqlitePool, req: ReleaseRequest) -> AppResult<Release
             // insert affects no rows and we fall back to the row the winner created.
             let inserted = sqlx::query(
                 "INSERT INTO releases (id, artist, title, release_year, album_art_url, country, \
-                 spotify_id, musicbrainz_id, created_at) VALUES (?,?,?,?,?,?,?,?,?) \
+                 musicbrainz_id, created_at) VALUES (?,?,?,?,?,?,?,?) \
                  ON CONFLICT DO NOTHING",
             )
             .bind(&id)
@@ -114,7 +114,6 @@ pub async fn create(pool: &SqlitePool, req: ReleaseRequest) -> AppResult<Release
             .bind(req.release_year)
             .bind(&req.album_art_url)
             .bind(&req.country)
-            .bind(blank_to_none(&req.spotify_id))
             .bind(blank_to_none(&req.musicbrainz_id))
             .bind(&stamp)
             .execute(&mut *tx)
@@ -122,7 +121,7 @@ pub async fn create(pool: &SqlitePool, req: ReleaseRequest) -> AppResult<Release
             .map_err(map_err)?;
 
             if inserted.rows_affected() == 0 {
-                find_catalog(&mut *tx, req.spotify_id.as_deref(), req.musicbrainz_id.as_deref())
+                find_catalog(&mut *tx, req.musicbrainz_id.as_deref())
                     .await?
                     .ok_or_else(|| AppError::Internal("catalog insert conflicted but no row found".into()))?
             } else {
@@ -288,7 +287,7 @@ pub async fn search_catalog(pool: &SqlitePool, q: &str, limit: u32) -> AppResult
 
     let rows = sqlx::query(
         "SELECT r.id, r.artist, r.title, r.release_year, r.album_art_url, r.country, \
-                r.spotify_id, r.musicbrainz_id \
+                r.musicbrainz_id \
          FROM releases_fts f JOIN releases r ON r.rowid = f.rowid \
          WHERE releases_fts MATCH ? ORDER BY rank LIMIT ?",
     )
@@ -346,7 +345,6 @@ pub async fn search_catalog(pool: &SqlitePool, q: &str, limit: u32) -> AppResult
                 country: row.try_get("country").map_err(map_err)?,
                 genres: genres.get(&id).cloned().unwrap_or_default(),
                 streaming_links: links.get(&id).cloned().unwrap_or_default(),
-                spotify_id: row.try_get("spotify_id").map_err(map_err)?,
                 musicbrainz_id: row.try_get("musicbrainz_id").map_err(map_err)?,
             })
         })
@@ -380,28 +378,23 @@ pub async fn list_countries(pool: &SqlitePool) -> AppResult<Vec<String>> {
 
 // ---------------------------------------------------------------- helpers
 
+/// Finds the catalog row for a release by its MusicBrainz id, if it has one.
+///
+/// This used to check a Spotify id first. Nothing has written one since Spotify became
+/// link-only, so the column is gone and the lookup is a single query with no interpolated
+/// column name.
 async fn find_catalog(
     conn: &mut sqlx::SqliteConnection,
-    spotify_id: Option<&str>,
     musicbrainz_id: Option<&str>,
 ) -> AppResult<Option<String>> {
-    // Spotify first, then MusicBrainz, matching findExistingCatalogRelease.
-    // The column name comes from this fixed pair, never from input.
-    for (column, value) in [("spotify_id", spotify_id), ("musicbrainz_id", musicbrainz_id)] {
-        let Some(v) = value.map(str::trim).filter(|v| !v.is_empty()) else {
-            continue;
-        };
-        let found: Option<String> =
-            sqlx::query_scalar(&format!("SELECT id FROM releases WHERE {column} = ?"))
-                .bind(v)
-                .fetch_optional(&mut *conn)
-                .await
-                .map_err(map_err)?;
-        if found.is_some() {
-            return Ok(found);
-        }
-    }
-    Ok(None)
+    let Some(id) = musicbrainz_id.map(str::trim).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    sqlx::query_scalar("SELECT id FROM releases WHERE musicbrainz_id = ?")
+        .bind(id)
+        .fetch_optional(&mut *conn)
+        .await
+        .map_err(map_err)
 }
 
 /// Replaces a release's genres wholesale, creating any that do not exist yet.

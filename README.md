@@ -238,7 +238,7 @@ either side of the boundary fails in CI rather than at runtime.
 A shared catalog plus per-user tracking, kept from the web app because it is what would
 make sync tractable later:
 
-- `releases` — deduplicated catalog, keyed by `spotify_id` or `musicbrainz_id`.
+- `releases` — deduplicated catalog, keyed by `musicbrainz_id`.
 - `user_releases` — status, rating, notes, dates. Deleting one leaves the catalog row.
 
 The `id` in an API response is the catalog release id; `createdAt` is from the tracking

@@ -32,10 +32,9 @@ This mirrors the precedence `repo::releases::create` already uses to dedupe the 
 minus the Spotify step, so import reuses logic that is already tested rather than
 inventing a second notion of sameness.
 
-There is no `spotifyId` in this format. The column exists in the schema and the dedup
-still checks it, but nothing has written one since Spotify became link-only: the resolver
-returns null unconditionally. Exporting a field that is null in every row of every library
-would be inviting a future importer to depend on it.
+There is no `spotifyId` anywhere any more. Nothing had written one since Spotify became
+link-only, so the column was removed from the schema along with the dedup step that
+checked it.
 
 The second rule is a heuristic and can be wrong: two genuinely different releases with the
 same artist and title and no external ids will be treated as one. That is rare, it only
@@ -137,7 +136,6 @@ rejected.
 ## What is not exported
 
 - **Local row ids**, for the reason above.
-- **`spotifyId`**, which is null in every row and has been since Phase 4.
 - **The local user id.** A sentinel with one value; sync would assign a real one.
 - **Catalog rows you no longer track.** Deleting a release keeps its catalog entry, which
   is an implementation detail of the two-table split, not part of your library.

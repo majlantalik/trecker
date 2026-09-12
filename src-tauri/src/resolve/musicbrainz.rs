@@ -150,7 +150,6 @@ impl Resolver {
             country,
             streaming_links: HashMap::new(),
             genres: Vec::new(),
-            spotify_id: None,
             musicbrainz_id: Some(mbid),
         })
     }

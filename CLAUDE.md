@@ -98,8 +98,10 @@ it that way.** If a view starts importing `invoke` directly, the seam has leaked
 Preserved from the web app even though there is exactly one local user, because it is what
 would make sync tractable later:
 
-- `releases` — deduplicated catalog, keyed by `spotify_id` or `musicbrainz_id` (both
-  UNIQUE). Content-addressed, so these rows cannot conflict between devices.
+- `releases` — deduplicated catalog, keyed by `musicbrainz_id` (UNIQUE).
+  Content-addressed, so these rows cannot conflict between devices. A release with no
+  MusicBrainz id is never merged with another: guessing that identical text means an
+  identical album belongs in import, where the result is visible, not inside `create()`.
 - `user_releases` — per-user tracking. Status, rating, notes, `did_not_finish`,
   `date_listened`, `discovery_link`. Carries `user_id` (a local sentinel) and `updated_at`
   purely so sync would not need a schema change.

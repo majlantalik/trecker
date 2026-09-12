@@ -47,11 +47,7 @@ pub struct ReleaseRequest {
     pub discovery_link: Option<String>,
     pub streaming_links: Option<HashMap<String, String>>,
     pub genres: Option<Vec<String>>,
-    // Part of the wire contract already, but only read once the catalog exists: these are
-    // the dedup keys `ReleaseService.create()` looks up before inserting. Phase 3.
-    #[allow(dead_code)]
-    pub spotify_id: Option<String>,
-    #[allow(dead_code)]
+    /// The dedup key: a catalog row is found by this before a new one is inserted.
     pub musicbrainz_id: Option<String>,
 }
 
@@ -90,7 +86,6 @@ pub struct ResolvedMetadata {
     pub country: Option<String>,
     pub streaming_links: HashMap<String, String>,
     pub genres: Vec<String>,
-    pub spotify_id: Option<String>,
     pub musicbrainz_id: Option<String>,
 }
 

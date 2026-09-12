@@ -12,8 +12,7 @@ function makePrefill(overrides: Partial<ResolvedMetadata> = {}): ResolvedMetadat
     country: 'US',
     streamingLinks: { spotify: 'https://open.spotify.com/album/abc' },
     genres: ['Jazz', 'Blues'],
-    spotifyId: 'abc123',
-    musicbrainzId: undefined,
+    musicbrainzId: 'mbid-abc',
     ...overrides
   }
 }
@@ -115,7 +114,7 @@ describe('ReleaseForm', () => {
       expect(emitted![0][0]).toMatchObject({
         artist: 'Prefilled Artist',
         title: 'Prefilled Title',
-        spotifyId: 'abc123'
+        musicbrainzId: 'mbid-abc'
       })
     })
 
