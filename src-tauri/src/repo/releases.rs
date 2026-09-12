@@ -95,7 +95,7 @@ pub async fn create(pool: &SqlitePool, req: ReleaseRequest) -> AppResult<Release
     let stamp = now();
 
     // Find-or-create the catalog row, exactly as ReleaseService.create does.
-    let existing = find_catalog(&mut *tx, req.musicbrainz_id.as_deref()).await?;
+    let existing = find_catalog(&mut *tx, req.musicbrainz_release_group_id.as_deref()).await?;
 
     let release_id = match existing {
         Some(id) => id,
@@ -106,7 +106,7 @@ pub async fn create(pool: &SqlitePool, req: ReleaseRequest) -> AppResult<Release
             // insert affects no rows and we fall back to the row the winner created.
             let inserted = sqlx::query(
                 "INSERT INTO releases (id, artist, title, release_year, album_art_url, country, \
-                 musicbrainz_id, created_at) VALUES (?,?,?,?,?,?,?,?) \
+                 musicbrainz_release_group_id, created_at) VALUES (?,?,?,?,?,?,?,?) \
                  ON CONFLICT DO NOTHING",
             )
             .bind(&id)
@@ -115,14 +115,14 @@ pub async fn create(pool: &SqlitePool, req: ReleaseRequest) -> AppResult<Release
             .bind(req.release_year)
             .bind(&req.album_art_url)
             .bind(&req.country)
-            .bind(blank_to_none(&req.musicbrainz_id))
+            .bind(blank_to_none(&req.musicbrainz_release_group_id))
             .bind(&stamp)
             .execute(&mut *tx)
             .await
             .map_err(map_err)?;
 
             if inserted.rows_affected() == 0 {
-                find_catalog(&mut *tx, req.musicbrainz_id.as_deref())
+                find_catalog(&mut *tx, req.musicbrainz_release_group_id.as_deref())
                     .await?
                     .ok_or_else(|| AppError::Internal("catalog insert conflicted but no row found".into()))?
             } else {
@@ -288,7 +288,7 @@ pub async fn search_catalog(pool: &SqlitePool, q: &str, limit: u32) -> AppResult
 
     let rows = sqlx::query(
         "SELECT r.id, r.artist, r.title, r.release_year, r.album_art_url, r.country, \
-                r.musicbrainz_id \
+                r.musicbrainz_release_group_id \
          FROM releases_fts f JOIN releases r ON r.rowid = f.rowid \
          WHERE releases_fts MATCH ? ORDER BY rank LIMIT ?",
     )
@@ -346,10 +346,25 @@ pub async fn search_catalog(pool: &SqlitePool, q: &str, limit: u32) -> AppResult
                 country: row.try_get("country").map_err(map_err)?,
                 genres: genres.get(&id).cloned().unwrap_or_default(),
                 streaming_links: links.get(&id).cloned().unwrap_or_default(),
-                musicbrainz_id: row.try_get("musicbrainz_id").map_err(map_err)?,
+                musicbrainz_release_group_id: row.try_get("musicbrainz_release_group_id").map_err(map_err)?,
             })
         })
         .collect()
+}
+
+/// The MusicBrainz release group behind a tracked release, for refreshing it by id.
+/// None for a release typed in by hand; an error only if the release is not tracked.
+pub async fn release_group_id(pool: &SqlitePool, release_id: &str) -> AppResult<Option<String>> {
+    let row: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT r.musicbrainz_release_group_id FROM user_releases ur \
+         JOIN releases r ON r.id = ur.release_id WHERE ur.user_id = ? AND r.id = ?",
+    )
+    .bind(LOCAL_USER_ID)
+    .bind(release_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(map_err)?;
+    row.ok_or(AppError::NotFound("release"))
 }
 
 pub async fn list_genres(pool: &SqlitePool) -> AppResult<Vec<String>> {
@@ -379,19 +394,18 @@ pub async fn list_countries(pool: &SqlitePool) -> AppResult<Vec<String>> {
 
 // ---------------------------------------------------------------- helpers
 
-/// Finds the catalog row for a release by its MusicBrainz id, if it has one.
+/// Finds the catalog row for an album by its MusicBrainz release group, if it has one.
 ///
-/// This used to check a Spotify id first. Nothing has written one since Spotify became
-/// link-only, so the column is gone and the lookup is a single query with no interpolated
-/// column name.
+/// Keyed by group rather than by release so that two different pressings of one album,
+/// which a search can easily return on two separate adds, land on one catalog row.
 async fn find_catalog(
     conn: &mut sqlx::SqliteConnection,
-    musicbrainz_id: Option<&str>,
+    musicbrainz_release_group_id: Option<&str>,
 ) -> AppResult<Option<String>> {
-    let Some(id) = musicbrainz_id.map(str::trim).filter(|v| !v.is_empty()) else {
+    let Some(id) = musicbrainz_release_group_id.map(str::trim).filter(|v| !v.is_empty()) else {
         return Ok(None);
     };
-    sqlx::query_scalar("SELECT id FROM releases WHERE musicbrainz_id = ?")
+    sqlx::query_scalar("SELECT id FROM releases WHERE musicbrainz_release_group_id = ?")
         .bind(id)
         .fetch_optional(&mut *conn)
         .await
@@ -479,11 +493,11 @@ fn blank_to_none(v: &Option<String>) -> Option<&str> {
 
 /// A tracked release plus the catalog identifier an export carries.
 ///
-/// `Release` deliberately does not expose `musicbrainz_id` to the frontend, but the file
+/// `Release` deliberately does not expose the release group id to the frontend, but the file
 /// format needs it: it is the only key that survives a move to another machine.
 pub struct ExportRow {
     pub release: Release,
-    pub musicbrainz_id: Option<String>,
+    pub musicbrainz_release_group_id: Option<String>,
 }
 
 /// Every tracked release, unpaginated, in the order a person would want to read.
@@ -492,7 +506,7 @@ pub struct ExportRow {
 /// implementation detail of the two-table split, not part of your library.
 pub async fn export_all(pool: &SqlitePool) -> AppResult<Vec<ExportRow>> {
     let sql = format!(
-        "SELECT {RELEASE_COLUMNS}, r.musicbrainz_id AS musicbrainz_id \
+        "SELECT {RELEASE_COLUMNS}, r.musicbrainz_release_group_id AS musicbrainz_release_group_id \
          FROM user_releases ur JOIN releases r ON r.id = ur.release_id \
          WHERE ur.user_id = ? \
          ORDER BY r.artist COLLATE NOCASE, r.title COLLATE NOCASE, ur.id"
@@ -506,16 +520,16 @@ pub async fn export_all(pool: &SqlitePool) -> AppResult<Vec<ExportRow>> {
     // Read before `hydrate` consumes the rows. It preserves order, so zipping is safe.
     let ids: Vec<Option<String>> = rows
         .iter()
-        .map(|r| r.try_get("musicbrainz_id").map_err(map_err))
+        .map(|r| r.try_get("musicbrainz_release_group_id").map_err(map_err))
         .collect::<AppResult<_>>()?;
 
     Ok(hydrate(pool, rows)
         .await?
         .into_iter()
         .zip(ids)
-        .map(|(release, musicbrainz_id)| ExportRow {
+        .map(|(release, musicbrainz_release_group_id)| ExportRow {
             release,
-            musicbrainz_id,
+            musicbrainz_release_group_id,
         })
         .collect())
 }
@@ -575,7 +589,7 @@ pub async fn import_one(
             if mode == ImportMode::Overwrite {
                 sqlx::query(
                     "UPDATE releases SET artist = ?, title = ?, release_year = ?, \
-                     album_art_url = ?, country = ?, musicbrainz_id = ? WHERE id = ?",
+                     album_art_url = ?, country = ?, musicbrainz_release_group_id = ? WHERE id = ?",
                 )
                 .bind(&r.artist)
                 .bind(&r.title)
@@ -597,7 +611,7 @@ pub async fn import_one(
             let id = new_id();
             sqlx::query(
                 "INSERT INTO releases (id, artist, title, release_year, album_art_url, \
-                 country, musicbrainz_id, created_at) VALUES (?,?,?,?,?,?,?,?)",
+                 country, musicbrainz_release_group_id, created_at) VALUES (?,?,?,?,?,?,?,?)",
             )
             .bind(&id)
             .bind(&r.artist)

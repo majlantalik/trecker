@@ -47,8 +47,9 @@ pub struct ReleaseRequest {
     pub discovery_link: Option<String>,
     pub streaming_links: Option<HashMap<String, String>>,
     pub genres: Option<Vec<String>>,
-    /// The dedup key: a catalog row is found by this before a new one is inserted.
-    pub musicbrainz_id: Option<String>,
+    /// The dedup key: a catalog row is found by this before a new one is inserted. A
+    /// release group, so every pressing of one album resolves to the same row.
+    pub musicbrainz_release_group_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -86,7 +87,7 @@ pub struct ResolvedMetadata {
     pub country: Option<String>,
     pub streaming_links: HashMap<String, String>,
     pub genres: Vec<String>,
-    pub musicbrainz_id: Option<String>,
+    pub musicbrainz_release_group_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

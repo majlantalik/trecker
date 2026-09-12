@@ -96,13 +96,13 @@ async fn dedupes_catalog_on_external_id() {
     let (_d, pool) = fresh().await;
 
     let mut first = req("Slint", "Spiderland");
-    first.musicbrainz_id = Some("mbid-1".into());
+    first.musicbrainz_release_group_id = Some("mbid-1".into());
     let a = releases::create(&pool, first).await.unwrap();
 
     // Same MusicBrainz id, different spelling of the title: it is the same album, so the
     // catalog row must be reused rather than duplicated.
     let mut second = req("Slint", "Spiderland (Remaster)");
-    second.musicbrainz_id = Some("mbid-1".into());
+    second.musicbrainz_release_group_id = Some("mbid-1".into());
     let b = releases::create(&pool, second).await.unwrap();
 
     assert_eq!(a.id, b.id, "same catalog row");
@@ -137,9 +137,9 @@ async fn blank_external_ids_do_not_collide() {
     // Empty strings would collide on the UNIQUE constraint; NULL does not collide.
     let (_d, pool) = fresh().await;
     let mut a = req("A", "One");
-    a.musicbrainz_id = Some("   ".into());
+    a.musicbrainz_release_group_id = Some("   ".into());
     let mut b = req("B", "Two");
-    b.musicbrainz_id = Some("".into());
+    b.musicbrainz_release_group_id = Some("".into());
 
     let ra = releases::create(&pool, a).await.unwrap();
     let rb = releases::create(&pool, b).await.unwrap();
@@ -488,6 +488,41 @@ async fn refresh_repairs_stale_metadata_without_touching_user_data() {
     assert_eq!(refreshed.date_listened.as_deref(), Some("2026-02-01T12:00:00Z"));
 }
 
+/// A release with a group id is refreshed by lookup, not by searching its current text.
+/// A title that no longer matches anything must still come back as the album.
+#[tokio::test]
+#[ignore = "makes real network requests"]
+async fn refresh_goes_by_id_when_the_album_has_one() {
+    use crate::commands::refresh_metadata;
+    use crate::resolve::Resolver;
+
+    let (_d, pool) = fresh().await;
+    let mut r = req("Avenged Sevenfold", "a title no search would match");
+    r.musicbrainz_release_group_id = Some("180560ee-2d9d-33cf-8de7-cdaaba610739".into());
+    let created = releases::create(&pool, r).await.unwrap();
+
+    let refreshed = refresh_metadata(&pool, &Resolver::new("0.1.0-test"), &created.id)
+        .await
+        .unwrap();
+    assert_eq!(refreshed.title, "City of Evil");
+    assert_eq!(refreshed.release_year, Some(2005));
+}
+
+#[tokio::test]
+async fn release_group_id_is_read_back_for_tracked_releases_only() {
+    let (_d, pool) = fresh().await;
+    let mut with = req("Slint", "Spiderland");
+    with.musicbrainz_release_group_id = Some("group-1".into());
+    let with = releases::create(&pool, with).await.unwrap();
+    let without = releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
+
+    assert_eq!(releases::release_group_id(&pool, &with.id).await.unwrap().as_deref(), Some("group-1"));
+    assert_eq!(releases::release_group_id(&pool, &without.id).await.unwrap(), None);
+
+    releases::delete(&pool, &with.id).await.unwrap();
+    assert!(releases::release_group_id(&pool, &with.id).await.is_err(), "untracked is not found");
+}
+
 #[tokio::test]
 async fn refresh_of_a_missing_release_is_not_found() {
     use crate::commands::refresh_metadata;
@@ -681,11 +716,11 @@ async fn overwrite_replaces_every_field_including_the_ones_it_clears() {
 }
 
 #[tokio::test]
-async fn a_musicbrainz_id_matches_across_a_renamed_title() {
+async fn a_release_group_id_matches_across_a_renamed_title() {
     // Rule one of the identity order. The text can differ; the id is the album.
     let (_d, pool) = fresh().await;
     let mut r = req("Slint", "Spiderland (2014 remaster)");
-    r.musicbrainz_id = Some("266e8eb6-244f-450d-b419-7e3cdf815d4c".into());
+    r.musicbrainz_release_group_id = Some("266e8eb6-244f-450d-b419-7e3cdf815d4c".into());
     let created = releases::create(&pool, r).await.unwrap();
 
     let incoming = format!(
@@ -722,7 +757,7 @@ async fn a_release_you_deleted_comes_back_onto_its_own_catalog_row() {
 }
 
 #[tokio::test]
-async fn two_rows_sharing_a_musicbrainz_id_become_one_release() {
+async fn two_rows_sharing_a_release_group_id_become_one_release() {
     // The column is UNIQUE, so a file claiming one id twice cannot produce two rows. The
     // id is the identity: the second row is the same album, described differently.
     let (_d, pool) = fresh().await;

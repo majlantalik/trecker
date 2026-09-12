@@ -1,29 +1,21 @@
 //! Cover Art Archive client. Port of `MusicBrainzService.fetchCoverArt`.
 //!
 //! A separate service from the MusicBrainz API, so it is not behind the one-per-second
-//! gate. It is keyed by MusicBrainz release id, which is the whole reason the release
-//! lookup has to happen first.
+//! gate. Asked by release group, which returns the front cover of the pressing chosen to
+//! represent the album.
 
 use super::{Resolver, TIMEOUT};
 use serde_json::Value;
 use std::time::Duration;
 
 impl Resolver {
-    /// Artwork for a specific pressing, falling back to the album.
+    /// The album's cover.
     ///
-    /// The pressing a MusicBrainz search happens to match often has no art uploaded even
-    /// when the album plainly does: "Avenged Sevenfold - City of Evil" matches a Canadian
-    /// edition with nothing in the archive, while the release group has the cover
-    /// everyone would recognise. So a miss on the release is not a miss.
-    pub async fn cover_art(&self, mbid: &str, release_group_id: Option<&str>) -> Option<String> {
-        if let Some(url) = self.cover_art_for("release", mbid).await {
-            return Some(url);
-        }
-        self.cover_art_for("release-group", release_group_id?).await
-    }
-
-    async fn cover_art_for(&self, kind: &str, id: &str) -> Option<String> {
-        let url = format!("https://coverartarchive.org/{kind}/{id}");
+    /// Asked of the group rather than a pressing. A pressing often has nothing uploaded
+    /// when the album plainly does: City of Evil's Canadian edition has no art in the
+    /// archive, and a scan of a regional edition is not the cover anyone would recognise.
+    pub async fn cover_art(&self, release_group_id: &str) -> Option<String> {
+        let url = format!("https://coverartarchive.org/release-group/{release_group_id}");
 
         let mut attempt = 0;
         let body: Value = loop {

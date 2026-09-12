@@ -622,7 +622,7 @@ Unfreeze `backend/`. Strip every controller except auth, and add a sync endpoint
 The JWT work, the Postgres schema and the catalog model all survive intact.
 
 Conflict model, which the existing data model already gives us for free:
-- Catalog rows are content-addressed by `spotify_id` / `musicbrainz_id`. They dedupe by
+- Catalog rows are content-addressed by `musicbrainz_release_group_id`. They dedupe by
   definition and cannot conflict.
 - Only `user_releases` needs resolution, and it is one writer per device.
   Last-write-wins per field on an `updated_at` column covers it.
@@ -688,6 +688,29 @@ Two things worth remembering:
 - **`tauri-plugin-dialog` costs 3.5 MB.** The binary went from 4.2 MB to 7.7 MB for native
   file pickers, which is most of what fat LTO buys back. Worth it for a dialog people will
   use twice a year, but it is the whole reason the binary is no longer small.
+
+### Albums come from release groups
+
+Resolution searched MusicBrainz *releases*, meaning individual pressings, and borrowed
+the year, genres and cover from the matched pressing's release group to patch what the
+pressing got wrong. It now searches, looks up and stores release groups end to end, and the
+catalog's identity column became `musicbrainz_release_group_id`. Done by editing
+`0001_initial.sql` once more, with the one local album restored under its group id.
+
+Three things came out of it:
+
+- **Dedup now means what it says.** City of Evil is one group of 14 pressings. Keyed by
+  release, two adds of the same album could store two different pressings as two albums.
+- **The top search hit is often wrong,** and it was wrong before as well: exact title
+  matches tie at score 100 in no useful order. A single outranked *After Hours* and a live
+  bootleg outranked *Metallica*. Ties now break toward a plain album with the most
+  releases.
+- **Country lost its fallback to the pressing.** A group has no country, and a pressing's
+  is where it was sold. The artist's country or area is used, or nothing.
+
+Refresh became a lookup by id rather than a second search that could land on a different
+album. "Release group" stays out of the interface and out of the export's field names; it
+misleads anyone who has not read MusicBrainz's model.
 
 ## Open decisions
 

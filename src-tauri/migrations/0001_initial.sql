@@ -23,7 +23,9 @@ CREATE TABLE releases (
     release_year   INTEGER,
     album_art_url  TEXT,
     country        TEXT,
-    musicbrainz_id TEXT UNIQUE,
+    -- The album's MusicBrainz release group, not any one pressing of it. See
+    -- src-tauri/src/resolve/musicbrainz.rs for why the distinction decides dedup.
+    musicbrainz_release_group_id TEXT UNIQUE,
     created_at     TEXT NOT NULL
 );
 
@@ -56,7 +58,7 @@ CREATE TABLE release_streaming_links (
 -- ---------------------------------------------------------------- tracking
 
 -- The catalog / tracking split is kept even though there is exactly one local user.
--- Catalog rows are content-addressed by musicbrainz_id, so they dedupe by
+-- Catalog rows are content-addressed by musicbrainz_release_group_id, so they dedupe by
 -- definition and can never conflict; only this table needs conflict resolution. That is
 -- what makes the Phase 6 sync tractable, and it costs nothing to preserve now.
 CREATE TABLE user_releases (

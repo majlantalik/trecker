@@ -75,12 +75,20 @@ pub async fn refresh_metadata(
 ) -> AppResult<Release> {
     let current = repo::releases::get(pool, id).await?;
 
-    let found = resolver
-        .resolve(ResolveRequest {
-            query: Some(format!("{} - {}", current.artist, current.title)),
-            url: None,
-        })
-        .await?;
+    // By id when the album has one, which is every album added from a search. A second
+    // search could land on a different album entirely; a lookup cannot. Only a release
+    // typed in by hand has no id, and a search is the only way to find it anything.
+    let found = match repo::releases::release_group_id(pool, id).await? {
+        Some(group) => resolver.lookup(&group).await?,
+        None => {
+            resolver
+                .resolve(ResolveRequest {
+                    query: Some(format!("{} - {}", current.artist, current.title)),
+                    url: None,
+                })
+                .await?
+        }
+    };
 
     // A lookup that comes back with nothing recognisable must not wipe what is already
     // there. Refusing is better than overwriting a good record with an empty one.
@@ -230,7 +238,7 @@ pub async fn collect_export(pool: &sqlx::SqlitePool) -> AppResult<Vec<library::E
                 release_year: r.release_year,
                 country: r.country,
                 album_art_url: r.album_art_url,
-                musicbrainz_id: row.musicbrainz_id,
+                musicbrainz_id: row.musicbrainz_release_group_id,
                 genres: r.genres,
                 streaming_links: r.streaming_links.into_iter().collect(),
                 status: crate::repo::filter::status_str(r.status).to_string(),

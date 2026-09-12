@@ -32,6 +32,15 @@ A release is matched against the existing library in this order, stopping at the
 1. `musicbrainzId`, when both sides have one
 2. `artist` and `title`, compared case-insensitively after trimming
 
+`musicbrainzId` is the id of a MusicBrainz **release group**, which is MusicBrainz's word for
+an album across all its pressings, reissues and editions. It is not the id of a
+*release*, which in their model is one specific pressing. Look it up at
+`/ws/2/release-group/<id>`; asking `/ws/2/release/<id>` returns not found.
+
+The field name does not say "release group" on purpose. A CSV header is read by people in a
+spreadsheet, and to anyone who has not studied MusicBrainz's data model the term suggests a
+group of albums. This document is where the precision lives.
+
 Rule 1 mirrors the precedence `repo::releases::create` already uses to dedupe the catalog,
 so import reuses logic that is already tested rather than inventing a second notion of
 sameness. Rule 2 exists only here, because guessing that identical text means an identical
@@ -74,7 +83,7 @@ The canonical format. One file, one object.
       "releaseYear": 1991,
       "country": "US",
       "albumArtUrl": "https://coverartarchive.org/release/266e8eb6-.../19590732868-500.jpg",
-      "musicbrainzId": "266e8eb6-244f-450d-b419-7e3cdf815d4c",
+      "musicbrainzId": "…a release group id…",
       "genres": ["alternative rock", "rock"],
       "streamingLinks": { "spotify": "https://open.spotify.com/album/..." },
       "status": "LISTENED",
@@ -108,7 +117,7 @@ which is worth catching before writing anything.
 | `releaseYear` | integer or null | The album's first release year, not the pressing's |
 | `country` | string or null | ISO 3166-1 alpha-2, or a free-text area name |
 | `albumArtUrl` | string or null | A URL, not the image. See below. |
-| `musicbrainzId` | string or null | Match key |
+| `musicbrainzId` | string or null | Match key. A release group id, see below |
 | `genres` | array of strings | Sorted, may be empty |
 | `streamingLinks` | object | Service name to URL, may be empty |
 | `status` | `"QUEUED"` or `"LISTENED"` | |

@@ -181,8 +181,8 @@ binary. Iterate with `npm run dev`, not with `npm run build`.
 
 ```bash
 npm test           # 84 frontend tests
-npm run test:rust  # 100 Rust tests
-npm run test:net   # 5 tests against the live metadata services
+npm run test:rust  # 109 Rust tests
+npm run test:net   # 8 tests against the live metadata services
 ```
 
 The Rust integration tests run against a real temporary SQLite file through the real
@@ -265,7 +265,8 @@ either side of the boundary fails in CI rather than at runtime.
 A shared catalog plus per-user tracking, kept from the web app because it is what would
 make sync tractable later:
 
-- `releases` — deduplicated catalog, keyed by `musicbrainz_id`.
+- `releases` — deduplicated catalog, keyed by the album's MusicBrainz release group, so
+  every pressing of one album is one row.
 - `user_releases` — status, rating, notes, dates. Deleting one leaves the catalog row.
 
 The `id` in an API response is the catalog release id; `createdAt` is from the tracking

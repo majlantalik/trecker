@@ -27,7 +27,7 @@ export interface ReleaseRequest {
   discoveryLink?: string
   streamingLinks?: Record<string, string>
   genres?: string[]
-  musicbrainzId?: string
+  musicbrainzReleaseGroupId?: string
 }
 
 export interface ReleaseUpdateRequest {
@@ -59,7 +59,7 @@ export interface ResolvedMetadata {
   country: string | null
   streamingLinks: Record<string, string>
   genres: string[]
-  musicbrainzId?: string
+  musicbrainzReleaseGroupId?: string
 }
 
 export interface PageResponse<T> {

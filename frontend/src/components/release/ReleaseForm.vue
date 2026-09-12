@@ -84,7 +84,7 @@ const defaultForm = () => ({
   discoveryLink: '',
   streamingLinkInput: '',
   streamingLinks: {} as Record<string, string>,
-  musicbrainzId: '',
+  musicbrainzReleaseGroupId: '',
   genres: [] as string[]
 })
 
@@ -104,7 +104,7 @@ watch(visible, (val) => {
         discoveryLink: props.release.discoveryLink || '',
         streamingLinkInput: Object.values(links)[0] || '',
         streamingLinks: { ...links },
-              musicbrainzId: '',
+              musicbrainzReleaseGroupId: '',
         genres: [...props.release.genres]
       }
     } else if (props.prefill) {
@@ -119,7 +119,7 @@ watch(visible, (val) => {
         discoveryLink: '',
         streamingLinkInput: Object.values(links)[0] || '',
         streamingLinks: { ...links },
-        musicbrainzId: props.prefill.musicbrainzId || '',
+        musicbrainzReleaseGroupId: props.prefill.musicbrainzReleaseGroupId || '',
         genres: [...(props.prefill.genres || [])]
       }
     } else {
@@ -154,7 +154,7 @@ async function handleSubmit() {
       country: form.value.country || undefined,
       discoveryLink: form.value.discoveryLink || undefined,
       streamingLinks: buildStreamingLinks(),
-      musicbrainzId: form.value.musicbrainzId || undefined,
+      musicbrainzReleaseGroupId: form.value.musicbrainzReleaseGroupId || undefined,
       genres: form.value.genres
     })
     visible.value = false

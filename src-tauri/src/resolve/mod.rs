@@ -13,6 +13,9 @@
 //! A secret in a distributed binary is not a secret. So the shape changes: MusicBrainz
 //! for identity, the Cover Art Archive for artwork, MusicBrainz genres in place of
 //! Spotify's, and a pasted streaming URL is kept as a link rather than resolved.
+//!
+//! Every lookup is of a release group, never a single release. `musicbrainz.rs` explains
+//! why, and why that word never reaches the interface.
 
 pub mod coverart;
 pub mod musicbrainz;
@@ -26,7 +29,8 @@ use tokio::sync::Mutex;
 pub const TIMEOUT: Duration = Duration::from_secs(8);
 
 /// Whole-resolve budget. Larger than TIMEOUT because a resolve makes up to three
-/// sequential calls and the MusicBrainz gate puts a second between two of them.
+/// sequential calls: a search and a lookup a second apart behind the MusicBrainz gate,
+/// then the cover.
 const TOTAL_BUDGET: Duration = Duration::from_secs(20);
 
 pub struct Resolver {
@@ -85,39 +89,52 @@ impl Resolver {
             .ok_or_else(|| AppError::Resolve(format!("nothing found for '{raw}'")))
     }
 
-    /// MusicBrainz for identity, then the Cover Art Archive and genres to fill it out.
-    /// Both enrichment steps are best-effort: a release with no artwork and no tags is
-    /// still a perfectly good result.
+    /// Finds an album by text, then fills it out from its release group.
+    ///
+    /// The search hit identifies the group and the lookup is the authority for every
+    /// field, so a stale search index cannot leave an old title behind. If the lookup
+    /// fails the hit is still a usable result, just without genres or country.
     async fn search(&self, query: &str) -> Option<ResolvedMetadata> {
-        let mut result = self.mb_search_release(query).await?;
+        let hit = self.mb_search_release_group(query).await?;
+        let Some(id) = hit.musicbrainz_release_group_id.clone() else {
+            return Some(hit);
+        };
+        Some(self.fill_out(&id, hit).await)
+    }
 
-        if let Some(mbid) = result.musicbrainz_id.clone() {
-            // Details first, because everything else depends on what it returns. The
-            // search matched one pressing; this is what turns that into the album.
-            let details = self.mb_release_details(&mbid).await;
+    /// Everything known about an album whose release group is already known.
+    ///
+    /// Refresh uses this. A release added from a search keeps its group id, so repairing
+    /// its metadata is a direct lookup instead of a second search that might land on a
+    /// different album.
+    pub async fn lookup(&self, release_group_id: &str) -> AppResult<ResolvedMetadata> {
+        let id = release_group_id.to_string();
+        tokio::time::timeout(TOTAL_BUDGET, async {
+            let base = ResolvedMetadata {
+                musicbrainz_release_group_id: Some(id.clone()),
+                ..Default::default()
+            };
+            self.fill_out(&id, base).await
+        })
+        .await
+        .map_err(|_| AppError::Resolve("lookup timed out".into()))
+    }
 
-            result.genres = details.genres;
-
-            // The album's first release date beats the matched pressing's own date. A
-            // search for Spiderland can land on the 2014 reissue, and 1991 is the answer
-            // anyone actually wants.
-            if let Some(year) = details.first_release_year {
-                result.release_year = Some(year);
-            }
-
-            // The artist's country beats the pressing's. Where a particular edition was
-            // sold is close to arbitrary, and "Avenged Sevenfold are Canadian" is simply
-            // wrong. Falls back to the release country when the artist has none.
-            if details.artist_country.is_some() {
-                result.country = details.artist_country;
-            }
-
-            result.album_art_url = self
-                .cover_art(&mbid, details.release_group_id.as_deref())
-                .await;
+    /// Overlays the group lookup and the cover onto what is already known. Both are
+    /// best-effort: an album with no artwork and no tags is still a perfectly good result.
+    async fn fill_out(&self, id: &str, mut result: ResolvedMetadata) -> ResolvedMetadata {
+        if let Some(group) = self.mb_release_group(id).await {
+            result.artist = group.artist.or(result.artist);
+            result.title = group.title.or(result.title);
+            result.release_year = group.release_year.or(result.release_year);
+            result.genres = group.genres;
+            // Where the artist is from. The group has no country of its own, and there is
+            // deliberately no fallback to a pressing's: a blank is more honest than a
+            // Canadian flag on a band from California.
+            result.country = group.country;
         }
-
-        Some(result)
+        result.album_art_url = self.cover_art(id).await;
+        result
     }
 }
 
@@ -272,7 +289,10 @@ mod tests {
         assert_eq!(found.artist.as_deref(), Some("Slint"));
         assert_eq!(found.title.as_deref(), Some("Spiderland"));
         assert_eq!(found.release_year, Some(1991));
-        assert!(found.musicbrainz_id.is_some(), "identity comes from MusicBrainz");
+        assert!(
+            found.musicbrainz_release_group_id.is_some(),
+            "identity comes from MusicBrainz"
+        );
         assert!(found.album_art_url.is_some(), "artwork comes from the Cover Art Archive");
         assert!(found.country.is_some());
     }
@@ -282,8 +302,8 @@ mod tests {
     async fn rate_limit_gate_spaces_requests_out() {
         let r = Resolver::new("0.1.0-test");
         let start = std::time::Instant::now();
-        let _ = r.mb_search_release("Slint - Spiderland").await;
-        let _ = r.mb_search_release("Duster - Stratosphere").await;
+        let _ = r.mb_search_release_group("Slint - Spiderland").await;
+        let _ = r.mb_search_release_group("Duster - Stratosphere").await;
         let elapsed = start.elapsed();
         assert!(
             elapsed >= Duration::from_millis(1100),
@@ -311,11 +331,12 @@ mod tests {
         assert!(found.artist.is_none(), "no credentials, so no metadata");
     }
 
-    /// The release that failed in real use: the search matches a Canadian pressing with
-    /// no cover art of its own, credited to a band from California.
+    /// The album that failed in real use when resolution went through a release search:
+    /// it matched a Canadian pressing with no cover art and no genres, credited to a band
+    /// from California.
     #[tokio::test]
     #[ignore = "makes real network requests"]
-    async fn falls_back_to_the_album_when_the_pressing_has_no_art() {
+    async fn resolves_the_album_not_a_pressing() {
         let r = Resolver::new("0.1.0-test");
         let found = r
             .resolve(ResolveRequest {
@@ -329,11 +350,36 @@ mod tests {
         assert_eq!(found.title.as_deref(), Some("City of Evil"));
         assert_eq!(found.release_year, Some(2005));
         assert_eq!(found.country.as_deref(), Some("US"), "the band, not the pressing");
-        assert!(
-            found.album_art_url.is_some(),
-            "the pressing has no art but the release group does"
+        assert!(!found.genres.is_empty(), "the group is tagged even where the pressing is not");
+        assert_eq!(
+            found.musicbrainz_release_group_id.as_deref(),
+            Some("180560ee-2d9d-33cf-8de7-cdaaba610739")
         );
+        assert!(found.album_art_url.is_some(), "the album has a cover");
         let art = found.album_art_url.unwrap();
         assert!(art.starts_with("https://"), "must be https or the CSP blocks it: {art}");
+    }
+
+    /// "Metallica - Metallica" ranks a live bootleg first. The search has to reach past it.
+    #[tokio::test]
+    #[ignore = "makes real network requests"]
+    async fn a_self_titled_album_is_not_mistaken_for_a_bootleg() {
+        let r = Resolver::new("0.1.0-test");
+        let found = r
+            .resolve(ResolveRequest { query: Some("Metallica - Metallica".into()), url: None })
+            .await
+            .expect("should resolve");
+        assert_eq!(found.release_year, Some(1991), "{found:#?}");
+    }
+
+    /// Refresh goes by id. It must return the same album a search found, with no search.
+    #[tokio::test]
+    #[ignore = "makes real network requests"]
+    async fn a_lookup_by_id_returns_the_album() {
+        let r = Resolver::new("0.1.0-test");
+        let found = r.lookup("180560ee-2d9d-33cf-8de7-cdaaba610739").await.unwrap();
+        assert_eq!(found.artist.as_deref(), Some("Avenged Sevenfold"));
+        assert_eq!(found.title.as_deref(), Some("City of Evil"));
+        assert_eq!(found.release_year, Some(2005));
     }
 }
