@@ -56,7 +56,7 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-47 Rust tests and 31 frontend tests. The Rust integration tests in
+48 Rust tests and 73 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
