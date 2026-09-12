@@ -31,10 +31,10 @@
     </ul>
 
     <div class="sidebar-user">
-      <RouterLink to="/settings" class="user-info" active-class="user-info--active">
-        <div class="user-avatar"><i class="pi pi-cog" /></div>
+      <RouterLink to="/info" class="user-info" active-class="user-info--active">
+        <div class="user-avatar"><i class="pi pi-info-circle" /></div>
         <div class="user-text">
-          <span class="user-name">Settings</span>
+          <span class="user-name">Info</span>
           <span class="user-email">Local library</span>
         </div>
       </RouterLink>

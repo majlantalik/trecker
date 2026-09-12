@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { DbInfo } from '@/types'
 
-export const settingsApi = {
+export const infoApi = {
   async dbInfo(): Promise<DbInfo> {
-    return invoke<DbInfo>('settings_db_info')
+    return invoke<DbInfo>('info_db')
   }
 }

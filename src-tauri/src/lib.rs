@@ -41,7 +41,7 @@ pub fn run() {
             commands::stats_by_country,
             commands::stats_top_rated,
             commands::stats_year_end,
-            commands::settings_db_info,
+            commands::info_db,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

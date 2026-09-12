@@ -158,13 +158,13 @@ pub async fn stats_year_end(db: State<'_, Db>, year: Option<i32>) -> AppResult<V
     repo::stats::year_end(&db.pool, year).await
 }
 
-// ---------------------------------------------------------------- settings
+// ---------------------------------------------------------------- info
 
-/// Diagnostics, not part of the release API. Surfaces where the database actually is and
+/// Diagnostics, behind the Info view. Surfaces where the database actually is and
 /// what state it is in, which is the only way to tell from inside the app that the file
 /// was created, migrated and opened with the pragmas we asked for.
 #[tauri::command]
-pub async fn settings_db_info(db: State<'_, Db>) -> AppResult<DbInfo> {
+pub async fn info_db(db: State<'_, Db>) -> AppResult<DbInfo> {
     db.info().await
 }
 

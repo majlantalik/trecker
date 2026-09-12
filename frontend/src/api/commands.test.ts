@@ -9,6 +9,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke }))
 const { releasesApi } = await import('./releases')
 const { genresApi, countriesApi } = await import('./genres')
 const { statsApi } = await import('./stats')
+const { infoApi } = await import('./info')
 
 beforeEach(() => {
   invoke.mockReset()
@@ -80,6 +81,13 @@ describe('genres commands', () => {
   it('getAll takes no arguments', async () => {
     await genresApi.getAll()
     expect(invoke).toHaveBeenCalledWith('genres_list')
+  })
+})
+
+describe('info commands', () => {
+  it('dbInfo takes no arguments', async () => {
+    await infoApi.dbInfo()
+    expect(invoke).toHaveBeenCalledWith('info_db')
   })
 })
 

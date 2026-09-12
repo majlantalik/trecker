@@ -91,7 +91,7 @@ One SQLite file:
 | macOS | `~/Library/Application Support/cz.mtulek.trecker/trecker.db` |
 | Windows | `%APPDATA%\cz.mtulek.trecker\trecker.db` |
 
-Settings shows the exact path. Back it up by copying the file while the app is closed.
+The Info view shows the exact path. Back it up by copying the file while the app is closed.
 
 ---
 
@@ -177,7 +177,7 @@ trecker/
 │       │   └── stats/        ActivityChart, BreakdownChart, TopRatedList, YearEndList
 │       ├── stores/           releases.ts, genres.ts, stats.ts (Pinia)
 │       ├── types/index.ts    single source of truth for TS interfaces
-│       └── views/            QueueView, LibraryView, StatsView, EntryView, SettingsView
+│       └── views/            QueueView, LibraryView, StatsView, EntryView, InfoView
 ├── src-tauri/                Rust core
 │   ├── migrations/           sqlx migrations
 │   ├── tauri.conf.json
@@ -219,7 +219,7 @@ Seventeen Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `stats_by_country` | Breakdown by country |
 | `stats_top_rated` | Top-rated listened releases |
 | `stats_year_end` | Ranked list for a year |
-| `settings_db_info` | Database path, size, schema version, pragmas |
+| `info_db` | Database path, size, schema version, pragmas |
 
 `frontend/src/api/commands.test.ts` asserts every name and argument key, so a rename on
 either side of the boundary fails in CI rather than at runtime.

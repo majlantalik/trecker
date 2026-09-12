@@ -160,7 +160,7 @@ because FTS matches whole tokens and would stop finding "phere" inside "Stratosp
 quotes every token and appends `*`.
 
 **SQLite pragmas are per-connection.** Checking them from a separate reader tells you
-nothing about the app's pool. Use the Settings view's Database section, which reads them
+nothing about the app's pool. Use the Info view's Database section, which reads them
 on a pool connection.
 
 **MusicBrainz needs a real `User-Agent` and one request per second.** The limiter is a gate

@@ -1,14 +1,14 @@
 <template>
-  <div class="settings-view">
-    <div class="settings-header">
-      <div class="settings-avatar"><i class="pi pi-cog" /></div>
-      <div class="settings-header-info">
-        <h1 class="settings-title">Settings</h1>
-        <p class="settings-subtitle">This library lives on this machine.</p>
+  <div class="info-view">
+    <div class="info-header">
+      <div class="info-avatar"><i class="pi pi-info-circle" /></div>
+      <div class="info-header-text">
+        <h1 class="info-title">Info</h1>
+        <p class="info-subtitle">This library lives on this machine.</p>
       </div>
     </div>
 
-    <div class="settings-section">
+    <div class="info-section">
       <div class="section-header">
         <i class="pi pi-list section-icon" />
         <h2 class="section-title">Library</h2>
@@ -27,12 +27,13 @@
           <span class="stat-value">{{ counts.listened }}</span>
         </p>
         <p class="form-hint">
-          Reads still come from memory. The next step moves them onto the database below.
+          Counted from the database below. Deleting a release stops tracking it but keeps
+          the catalog entry, so these can be lower than the catalog row count.
         </p>
       </div>
     </div>
 
-    <div class="settings-section">
+    <div class="info-section">
       <div class="section-header">
         <i class="pi pi-database section-icon" />
         <h2 class="section-title">Database</h2>
@@ -83,7 +84,7 @@
       </div>
     </div>
 
-    <div class="settings-section">
+    <div class="info-section">
       <div class="section-header">
         <i class="pi pi-search section-icon" />
         <h2 class="section-title">Metadata providers</h2>
@@ -104,7 +105,7 @@
       </div>
     </div>
 
-    <div class="settings-section">
+    <div class="info-section">
       <div class="section-header">
         <i class="pi pi-info-circle section-icon" />
         <h2 class="section-title">About</h2>
@@ -123,7 +124,7 @@
 import { ref, onMounted } from 'vue'
 import Tag from 'primevue/tag'
 import { releasesApi } from '@/api/releases'
-import { settingsApi } from '@/api/settings'
+import { infoApi } from '@/api/info'
 import type { DbInfo } from '@/types'
 
 const version = '0.1.0'
@@ -163,7 +164,7 @@ onMounted(async () => {
   }
 
   try {
-    db.value = await settingsApi.dbInfo()
+    db.value = await infoApi.dbInfo()
   } catch (e: any) {
     dbError.value = e?.message ?? String(e)
   }
@@ -171,7 +172,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.settings-view {
+.info-view {
   max-width: 720px;
   margin: 0 auto;
   padding: 1.5rem;
@@ -180,7 +181,7 @@ onMounted(async () => {
   gap: 2rem;
 }
 
-.settings-header {
+.info-header {
   display: flex;
   align-items: center;
   gap: 1.25rem;
@@ -188,7 +189,7 @@ onMounted(async () => {
   border-bottom: 1px solid var(--tk-border);
 }
 
-.settings-avatar {
+.info-avatar {
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -202,27 +203,27 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.settings-header-info {
+.info-header-text {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
   min-width: 0;
 }
 
-.settings-title {
+.info-title {
   font-size: 1.35rem;
   font-weight: 700;
   margin: 0;
   color: var(--tk-text);
 }
 
-.settings-subtitle {
+.info-subtitle {
   font-size: 0.875rem;
   color: rgba(226, 228, 240, 0.55);
   margin: 0;
 }
 
-.settings-section {
+.info-section {
   background: var(--tk-surface);
   border: 1px solid var(--tk-border);
   border-radius: 14px;
