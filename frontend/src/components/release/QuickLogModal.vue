@@ -3,8 +3,9 @@
     v-model:visible="visible"
     header="Log it"
     modal
-    :style="{ width: '440px' }"
+    :style="{ width: 'min(440px, calc(100vw - 3rem))' }"
     :draggable="false"
+    :pt="{ root: { class: 'tk-dialog' } }"
   >
     <div v-if="release" class="quick-log-content">
       <div class="release-summary">
@@ -18,22 +19,22 @@
       <Divider />
 
       <div class="log-field">
-        <label>Rating</label>
+        <label class="tk-label">Rating</label>
         <HalfStarRating v-model="form.rating" :cancel="true" />
       </div>
 
       <div class="log-field">
-        <label>Genres</label>
+        <label class="tk-label">Genres</label>
         <GenreTagInput v-model="form.genres" />
       </div>
 
       <div class="log-field">
-        <label>Country</label>
+        <label class="tk-label">Country</label>
         <CountrySelect v-model="form.country" fluid />
       </div>
 
       <div class="log-field">
-        <label>Notes</label>
+        <label class="tk-label">Notes</label>
         <Textarea v-model="form.notes" rows="3" placeholder="Your thoughts..." fluid />
       </div>
 
@@ -46,7 +47,9 @@
 
       <div class="log-actions">
         <Button label="Cancel" severity="secondary" outlined @click="visible = false" />
-        <Button label="Log it" icon="pi pi-check" :loading="saving" @click="handleLog(false)" />
+        <!-- autofocus: the dialog focuses it on opening instead of the close button, and
+             Enter logs, which is what Quick Log is for. -->
+        <Button label="Log it" icon="pi pi-check" :loading="saving" autofocus @click="handleLog(false)" />
         <Button label="Log + Details" icon="pi pi-arrow-right" severity="secondary" :loading="saving" @click="handleLog(true)" />
       </div>
     </div>
@@ -163,11 +166,12 @@ async function handleLog(navigateToEntry: boolean) {
   width: 48px;
   height: 48px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .summary-title {
   font-weight: 600;
+  color: var(--tk-text);
 }
 
 .summary-artist {
@@ -179,12 +183,6 @@ async function handleLog(navigateToEntry: boolean) {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-}
-
-.log-field label {
-  font-size: 0.85rem;
-  color: var(--p-text-muted-color);
-  font-weight: 500;
 }
 
 .log-field-inline {

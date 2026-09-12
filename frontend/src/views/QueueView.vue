@@ -45,7 +45,7 @@
       @logged="onLogged"
     />
 
-    <ConfirmDialog />
+    <ConfirmDialog :pt="{ root: { class: 'tk-dialog' } }" />
   </div>
 </template>
 

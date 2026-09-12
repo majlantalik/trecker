@@ -30,17 +30,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import Dialog from 'primevue/dialog'
 import { useShortcut } from '@/composables/useShortcut'
+import { useShortcutsHelp } from '@/composables/useShortcutsHelp'
 import { SHORTCUTS, SHORTCUT_GROUPS, displayKey } from '@/composables/shortcuts'
 
-const open = ref(false)
+const { open, toggle } = useShortcutsHelp()
 
 // Not `whileTyping`: "?" is a character people type into notes and search boxes.
-useShortcut('?', () => {
-  open.value = !open.value
-})
+useShortcut('?', toggle)
 
 function byGroup(group: string) {
   return SHORTCUTS.filter((s) => s.group === group)

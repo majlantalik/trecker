@@ -59,7 +59,7 @@
           </Column>
           <Column field="dateListened" header="Listened" sortable style="width: 130px">
             <template #body="{ data }">
-              {{ data.dateListened ? formatDate(data.dateListened) : '' }}
+              <span class="date-cell">{{ data.dateListened ? formatDate(data.dateListened) : '' }}</span>
             </template>
           </Column>
           <Column style="width: 80px">
@@ -111,7 +111,7 @@
       @logged="releasesStore.fetchReleases()"
     />
 
-    <ConfirmDialog />
+    <ConfirmDialog :pt="{ root: { class: 'tk-dialog' } }" />
   </div>
 </template>
 
@@ -346,6 +346,12 @@ function formatDate(iso: string) {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
   padding: 0.75rem 1rem !important;
   color: var(--tk-text);
+  /* Down from the page's 18px body size, which read large in a dense table. */
+  font-size: 0.95rem;
+}
+
+.date-cell {
+  white-space: nowrap;
 }
 
 .library-table :deep(.p-datatable-table-container) {

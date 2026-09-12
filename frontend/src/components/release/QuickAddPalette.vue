@@ -75,7 +75,5 @@ async function onShow() {
 .qap-mask {
   align-items: flex-start;
   padding-top: 14vh;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
 }
 </style>

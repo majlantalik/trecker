@@ -186,7 +186,7 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 124 frontend tests
+npm test           # 129 frontend tests
 npm run test:rust  # 134 Rust tests
 npm run test:net   # 11 tests against the live metadata services
 ```

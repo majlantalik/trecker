@@ -38,6 +38,17 @@
           <span class="user-email">Local library</span>
         </div>
       </RouterLink>
+      <!-- The only visible way to the shortcuts list, which "?" also opens. Drawn as the key
+           itself, so the button teaches the shortcut it stands in for. -->
+      <button
+        type="button"
+        class="shortcuts-btn"
+        aria-label="Keyboard shortcuts"
+        v-tooltip.top="'Keyboard shortcuts'"
+        @click="showShortcuts"
+      >
+        <kbd>?</kbd>
+      </button>
     </div>
   </nav>
 </template>
@@ -46,8 +57,10 @@
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useReleasesStore } from '@/stores/releases'
+import { useShortcutsHelp } from '@/composables/useShortcutsHelp'
 
 const releasesStore = useReleasesStore()
+const { show: showShortcuts } = useShortcutsHelp()
 
 // queuedTotal, not total: `total` belongs to whichever list was fetched last, so this
 // badge used to show the Library count while sitting next to the word "Queue".
@@ -261,6 +274,48 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+}
+
+.shortcuts-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.shortcuts-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.shortcuts-btn:focus-visible {
+  outline: 2px solid var(--tk-accent-glow);
+  outline-offset: 1px;
+}
+
+.shortcuts-btn kbd {
+  font-family: var(--tk-font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 1.4rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 5px;
+  border: 1px solid var(--tk-border-hover);
+  border-bottom-width: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 228, 240, 0.7);
+}
+
+.shortcuts-btn:hover kbd {
+  color: var(--tk-accent);
+  border-color: rgba(0, 229, 176, 0.35);
 }
 
 .user-email {

@@ -220,7 +220,7 @@
     </div>
 
     <QuickLogModal v-model:visible="showLogModal" :release="release" @logged="onLogged" />
-    <ConfirmDialog />
+    <ConfirmDialog :pt="{ root: { class: 'tk-dialog' } }" />
   </div>
 
   <div v-else-if="loading" class="loading-state">

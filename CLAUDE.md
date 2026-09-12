@@ -57,7 +57,7 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-134 Rust tests and 124 frontend tests. The Rust integration tests in
+134 Rust tests and 129 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
@@ -279,7 +279,8 @@ which are assembled at runtime. The integration tests catch a wrong column name 
 theme at runtime, after the app's stylesheet, so a one-class rule such as
 `.my-dialog { background: ... }` loses to `.p-dialog` and never applies, with no error. Set
 the variable the theme reads instead, such as `--p-dialog-background`, on the component's
-root; `.tk-dialog` in `App.vue` does this for dialogs, so give new dialogs that class. The
+root; `.tk-dialog` in `App.vue` does this for dialogs, so give every dialog that class.
+`components/dialogs.guard.test.ts` fails for one that lacks it. The
 name of any token's variable comes from `dt()` in `@primeuix/styled`, and the tokens are
 listed in `@primeuix/themes/dist/aura/<component>`.
 

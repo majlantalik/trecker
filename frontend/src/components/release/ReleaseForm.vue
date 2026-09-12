@@ -3,40 +3,42 @@
     v-model:visible="visible"
     :header="isEdit ? 'Edit Release' : 'Add to Queue'"
     modal
-    :style="{ width: '720px' }"
+    :style="{ width: 'min(720px, calc(100vw - 3rem))' }"
     :draggable="false"
+    :pt="{ root: { class: 'tk-dialog' } }"
   >
     <form @submit.prevent="handleSubmit" class="release-form">
       <div class="form-row">
         <div class="form-field" style="flex: 2">
-          <label>Artist *</label>
-          <InputText v-model="form.artist" placeholder="Artist name" fluid required />
+          <label class="tk-label">Artist *</label>
+          <!-- autofocus: otherwise the dialog focuses its close button when it opens. -->
+          <InputText v-model="form.artist" placeholder="Artist name" fluid required autofocus />
         </div>
         <div class="form-field" style="flex: 3">
-          <label>Title *</label>
+          <label class="tk-label">Title *</label>
           <InputText v-model="form.title" placeholder="Album / EP title" fluid required />
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-field">
-          <label>Year</label>
+          <label class="tk-label">Year</label>
           <InputNumber v-model="form.releaseYear" placeholder="2024" :min="1900" :max="2099" :useGrouping="false" fluid />
         </div>
       </div>
 
       <div class="form-field">
-        <label>Genres</label>
+        <label class="tk-label">Genres</label>
         <GenreTagInput v-model="form.genres" />
       </div>
 
       <div class="form-row">
         <div class="form-field" style="flex: 1">
-          <label>Discovery Link</label>
+          <label class="tk-label">Discovery Link</label>
           <InputText v-model="form.discoveryLink" placeholder="YouTube, Discord..." fluid />
         </div>
         <div class="form-field" style="flex: 1">
-          <label>Streaming Link</label>
+          <label class="tk-label">Streaming Link</label>
           <InputText v-model="form.streamingLinkInput" placeholder="Spotify, Tidal..." fluid />
         </div>
       </div>
@@ -184,17 +186,12 @@ async function handleSubmit() {
   flex: 1;
 }
 
-.form-field label {
-  font-size: 0.85rem;
-  color: var(--p-text-muted-color);
-  font-weight: 500;
-}
-
 .album-art-preview {
   width: 80px;
   height: 80px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--tk-border);
 }
 
 .form-actions {

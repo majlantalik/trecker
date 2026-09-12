@@ -88,6 +88,9 @@ h1, h2, h3, h4 {
   --p-dialog-title-font-size: 1.1rem;
   --p-dialog-title-font-weight: 700;
 
+  --p-text-muted-color: rgba(226, 228, 240, 0.55);
+  --p-divider-border-color: var(--tk-border);
+
   /* Lists inside a dialog sit on the panel rather than on a darker form field. */
   --p-listbox-background: transparent;
   --p-listbox-border-color: var(--tk-border);
@@ -106,6 +109,69 @@ h1, h2, h3, h4 {
 .tk-dialog .p-dialog-title {
   font-family: var(--tk-font-display);
   letter-spacing: -0.02em;
+}
+
+/*
+ * Frosted glass behind every modal: the page stays visible but blurred and dimmed, so the
+ * dialog reads as a layer above it rather than a hole punched through it.
+ *
+ * `--px-mask-background` is PrimeVue's own override for the mask colour, which its
+ * fade-in animation also uses. The theme sets no backdrop-filter, so that part needs no
+ * variable. WebKitGTK supports it unprefixed; the prefix is for older WebKit on macOS.
+ */
+.p-overlay-mask.p-dialog-mask {
+  --px-mask-background: rgba(8, 9, 16, 0.4);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+}
+
+/*
+ * The blur has to fade with the tint. PrimeVue animates only the mask's colour, so on
+ * closing the tint faded while the blur stayed at full strength, then vanished at once
+ * when the mask was removed.
+ *
+ * The fade is on the mask's opacity, never on the blur itself. Animating backdrop-filter
+ * makes WebKitGTK's compositor blur the whole layer, dialog included, instead of only what
+ * is behind it. Fading the mask also fades the dialog inside it, which is already fading
+ * on its own, so the two move together.
+ *
+ * `animation` is a single property, so these rules repeat PrimeVue's own colour fade next
+ * to the opacity fade rather than replacing it. Two classes, to outrank its one-class
+ * rules, which load later. While closing the mask carries both classes, and the leave
+ * rule wins by coming second.
+ */
+.p-dialog-mask.p-overlay-mask-enter-active {
+  animation:
+    p-animate-overlay-mask-enter var(--p-mask-transition-duration, 0.3s) forwards,
+    tk-mask-fade-in var(--p-mask-transition-duration, 0.3s) forwards;
+}
+
+.p-dialog-mask.p-overlay-mask-leave-active {
+  animation:
+    p-animate-overlay-mask-leave var(--p-mask-transition-duration, 0.3s) forwards,
+    tk-mask-fade-out var(--p-mask-transition-duration, 0.3s) forwards;
+}
+
+@keyframes tk-mask-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tk-mask-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* A form field's label, in the uppercase style of the library filters' labels. Brighter
+   than theirs, which use --tk-text-muted and are too faint to read on a dialog panel. */
+.tk-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(226, 228, 240, 0.55);
 }
 
 /* Keyboard shortcut hints. Wrapped in :where() so it adds no specificity, and a dialog's
