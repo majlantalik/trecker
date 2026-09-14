@@ -12,6 +12,9 @@
       <div class="card-meta">
         <span v-if="release.releaseYear" class="meta-item">{{ release.releaseYear }}</span>
         <CountryLabel v-if="release.country" :value="release.country" compact class="meta-item" />
+        <span v-if="showAdded" class="meta-item meta-added" :title="`Added ${formatAdded(release.createdAt)}`">
+          <i class="pi pi-calendar-plus" />{{ formatAdded(release.createdAt) }}
+        </span>
       </div>
       <div class="card-genres" v-if="release.genres.length">
         <Tag v-for="genre in release.genres.slice(0, 3)" :key="genre" :value="genre" severity="secondary" />
@@ -33,8 +36,16 @@ import CountryLabel from '@/components/common/CountryLabel.vue'
 import Tag from 'primevue/tag'
 import type { Release } from '@/types'
 
-defineProps<{ release: Release }>()
+defineProps<{
+  release: Release
+  /** Shows when the album was added, for lists ordered by it. */
+  showAdded?: boolean
+}>()
 defineEmits<{ click: [release: Release] }>()
+
+function formatAdded(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
 </script>
 
 <style scoped>
@@ -114,6 +125,16 @@ defineEmits<{ click: [release: Release] }>()
   font-size: 0.78rem;
   color: var(--tk-text-muted);
   opacity: 0.7;
+}
+
+.meta-added {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.meta-added i {
+  font-size: 0.7rem;
 }
 
 .card-genres {

@@ -43,7 +43,9 @@ The reasoning is in [ADR 0003](docs/adr/0003-streaming-services-are-link-only.md
 
 ### Queue
 
-Everything you have not listened to yet.
+Everything you have not listened to yet, ordered by the date you added it. **Newest first**
+next to the title reverses that to oldest first, so you can work through the queue in the
+order albums arrived. Trecker remembers the choice, which is also in **Settings**.
 
 - **Log** opens the Quick Log modal.
 - **Pick one for me** chooses a queued release at random.
@@ -113,6 +115,8 @@ They are not part of your library and are not exported.
   menu has Open, Quick add and Quit. Keeping Trecker running makes the quick add shortcut
   appear instantly instead of starting the app first. Starting Trecker again always brings
   its window back.
+- **Queue**: newest or oldest added first. The button at the top of the queue sets the same
+  choice.
 
 ### Where your data lives
 
@@ -213,8 +217,8 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 141 frontend tests
-npm run test:rust  # 147 Rust tests
+npm test           # 149 frontend tests
+npm run test:rust  # 148 Rust tests
 npm run test:net   # 11 tests against the live metadata services
 ```
 

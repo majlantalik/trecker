@@ -8,6 +8,9 @@
       </div>
     </div>
 
+    <!-- One place for a failed save, whichever section it came from. -->
+    <p v-if="error" class="settings-error" role="alert">{{ error }}</p>
+
     <div class="settings-section">
       <div class="section-header">
         <i class="pi pi-window-maximize section-icon" />
@@ -29,7 +32,31 @@
             <span class="choice-description">{{ option.description }}</span>
           </label>
         </div>
-        <p v-if="error" class="settings-error">{{ error }}</p>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="section-header">
+        <i class="pi pi-inbox section-icon" />
+        <h2 class="section-title">Queue</h2>
+      </div>
+      <div class="section-body">
+        <p class="tk-label">Order albums by the date you added them</p>
+        <div v-for="option in QUEUE_OPTIONS" :key="option.value" class="choice">
+          <RadioButton
+            :input-id="`queue-${option.value}`"
+            name="queue-sort"
+            :value="option.value"
+            :model-value="settings?.queueSort"
+            :disabled="!settings || saving"
+            @update:model-value="(value: QueueSort) => update({ queueSort: value })"
+          />
+          <label :for="`queue-${option.value}`" class="choice-text">
+            <span class="choice-title">{{ option.title }}</span>
+            <span class="choice-description">{{ option.description }}</span>
+          </label>
+        </div>
+        <p class="form-hint">The button at the top of the queue changes this too.</p>
       </div>
     </div>
 
@@ -73,7 +100,7 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { appApi } from '@/api/app'
 import { useSettings } from '@/composables/useSettings'
-import type { CloseAction } from '@/types'
+import type { CloseAction, QueueSort } from '@/types'
 
 const CLOSE_OPTIONS: { value: CloseAction; title: string; description: string }[] = [
   {
@@ -86,6 +113,19 @@ const CLOSE_OPTIONS: { value: CloseAction; title: string; description: string }[
     title: 'Keep running in the tray',
     description:
       'The window hides and an icon stays in the tray, with Open, Quick add and Quit. Starting Trecker again also brings the window back.'
+  }
+]
+
+const QUEUE_OPTIONS: { value: QueueSort; title: string; description: string }[] = [
+  {
+    value: 'newest',
+    title: 'Newest first',
+    description: 'What you added last is at the top.'
+  },
+  {
+    value: 'oldest',
+    title: 'Oldest first',
+    description: 'Work through the queue in the order albums arrived.'
   }
 ]
 

@@ -81,6 +81,33 @@ describe('releases store', () => {
     expect(store.total).toBe(1) // incremented from 0 to 1
   })
 
+  it('addRelease refetches instead of prepending when the list is oldest first', async () => {
+    mockReleasesApi.create.mockResolvedValue(makeRelease({ id: 'new', status: 'QUEUED' }))
+    const old = makeRelease({ id: 'old', status: 'QUEUED' })
+    mockReleasesApi.getAll.mockResolvedValue(makePage([old]))
+
+    const store = useReleasesStore()
+    store.setFilters({ status: 'QUEUED', sort: 'createdAt', direction: 'ASC' })
+    store.releases = [old]
+    await store.addRelease({ artist: 'A', title: 'T' })
+
+    expect(store.releases.map(r => r.id)).not.toContain('new')
+    expect(mockReleasesApi.getAll).toHaveBeenCalledWith(expect.objectContaining({ status: 'QUEUED', direction: 'ASC' }))
+  })
+
+  it('addRelease leaves a list of listened releases alone', async () => {
+    mockReleasesApi.create.mockResolvedValue(makeRelease({ id: 'new', status: 'QUEUED' }))
+
+    const store = useReleasesStore()
+    store.setFilters({ status: 'LISTENED', sort: 'dateListened', direction: 'DESC' })
+    store.releases = [makeRelease({ id: 'old', status: 'LISTENED' })]
+    store.total = 1
+    await store.addRelease({ artist: 'A', title: 'T' })
+
+    expect(store.releases.map(r => r.id)).toEqual(['old'])
+    expect(store.total).toBe(1)
+  })
+
   it('deleteRelease removes the correct release by id', async () => {
     mockReleasesApi.delete.mockResolvedValue(undefined)
 

@@ -60,9 +60,17 @@ export const useReleasesStore = defineStore('releases', () => {
 
   async function addRelease(request: Parameters<typeof releasesApi.create>[0]) {
     const release = await releasesApi.create(request)
-    releases.value = [release, ...releases.value]
-    total.value++
     refreshQueuedCount()
+    const f = filters.value
+    if (f.status && f.status !== release.status) return release
+    // Only the first page of a newest-first list has an obvious place for it: the top.
+    // Anywhere else, such as the queue sorted oldest first, ask for the page again.
+    if (f.sort === 'createdAt' && f.direction === 'DESC' && currentPage.value === 0) {
+      releases.value = [release, ...releases.value]
+      total.value++
+    } else {
+      fetchReleases()
+    }
     return release
   }
 

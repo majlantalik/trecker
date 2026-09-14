@@ -8,7 +8,7 @@ const { useSettings } = await import('./useSettings')
 
 beforeEach(() => {
   vi.clearAllMocks()
-  get.mockResolvedValue({ closeAction: 'quit' })
+  get.mockResolvedValue({ closeAction: 'quit', queueSort: 'newest' })
   update.mockImplementation(async (s) => s)
 })
 
@@ -16,14 +16,14 @@ describe('useSettings', () => {
   it('loads the current settings', async () => {
     const s = useSettings()
     await s.load()
-    expect(s.settings.value).toEqual({ closeAction: 'quit' })
+    expect(s.settings.value).toEqual({ closeAction: 'quit', queueSort: 'newest' })
   })
 
   it('saves a change at once', async () => {
     const s = useSettings()
     await s.load()
     await s.update({ closeAction: 'tray' })
-    expect(update).toHaveBeenCalledWith({ closeAction: 'tray' })
+    expect(update).toHaveBeenCalledWith({ closeAction: 'tray', queueSort: 'newest' })
     expect(s.settings.value?.closeAction).toBe('tray')
     expect(s.error.value).toBe('')
   })

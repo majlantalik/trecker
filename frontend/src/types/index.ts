@@ -160,6 +160,9 @@ export interface CoverCacheInfo {
 export type CloseAction = 'quit' | 'tray'
 
 /** Preferences for how the app behaves on this machine. Not part of the library. */
+export type QueueSort = 'newest' | 'oldest'
+
 export interface Settings {
   closeAction: CloseAction
+  queueSort: QueueSort
 }

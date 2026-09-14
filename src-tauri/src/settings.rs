@@ -22,12 +22,22 @@ pub enum CloseAction {
     Tray,
 }
 
+/// The order of the queue, by the date each album was added.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum QueueSort {
+    #[default]
+    Newest,
+    Oldest,
+}
+
 /// Every preference, each with a default, so a file written by an older version, or
 /// missing a field, still reads.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     pub close_action: CloseAction,
+    pub queue_sort: QueueSort,
 }
 
 pub struct SettingsStore {
@@ -96,16 +106,24 @@ mod tests {
     fn saved_settings_are_read_back_by_the_next_launch() {
         let dir = tempfile::tempdir().unwrap();
         let first = store(&dir);
-        first.replace(Settings { close_action: CloseAction::Tray }).unwrap();
+        first.replace(Settings { close_action: CloseAction::Tray, ..Settings::default() }).unwrap();
         assert_eq!(first.get().close_action, CloseAction::Tray);
         assert_eq!(store(&dir).get().close_action, CloseAction::Tray, "a fresh load");
+    }
+
+    #[test]
+    fn the_queue_order_is_kept_alongside_the_close_action() {
+        let dir = tempfile::tempdir().unwrap();
+        let next = Settings { close_action: CloseAction::Tray, queue_sort: QueueSort::Oldest };
+        store(&dir).replace(next.clone()).unwrap();
+        assert_eq!(store(&dir).get(), next);
     }
 
     #[test]
     fn the_file_is_readable_json() {
         // It is a file a person may open to fix by hand.
         let dir = tempfile::tempdir().unwrap();
-        store(&dir).replace(Settings { close_action: CloseAction::Tray }).unwrap();
+        store(&dir).replace(Settings { close_action: CloseAction::Tray, ..Settings::default() }).unwrap();
         let text = std::fs::read_to_string(dir.path().join("config/settings.json")).unwrap();
         assert!(text.contains(r#""closeAction": "tray""#), "{text}");
     }
@@ -127,11 +145,14 @@ mod tests {
         assert_eq!(serde_json::from_str::<Settings>("{}").unwrap(), Settings::default());
         let newer: Settings = serde_json::from_str(r#"{"closeAction":"tray","theme":"light"}"#).unwrap();
         assert_eq!(newer.close_action, CloseAction::Tray);
+        assert_eq!(newer.queue_sort, QueueSort::Newest, "a file from before the queue sort");
     }
 
     #[test]
     fn the_words_the_frontend_sends_are_the_ones_rust_reads() {
         assert_eq!(serde_json::from_str::<CloseAction>(r#""quit""#).unwrap(), CloseAction::Quit);
         assert_eq!(serde_json::from_str::<CloseAction>(r#""tray""#).unwrap(), CloseAction::Tray);
+        assert_eq!(serde_json::from_str::<QueueSort>(r#""newest""#).unwrap(), QueueSort::Newest);
+        assert_eq!(serde_json::from_str::<QueueSort>(r#""oldest""#).unwrap(), QueueSort::Oldest);
     }
 }
