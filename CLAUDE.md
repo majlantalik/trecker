@@ -361,6 +361,11 @@ from a picked suggestion, so the component catches Enter, Tab and comma itself, 
 lists, and keeps a half-typed genre on blur. The matching rules, including writing a known
 genre the way the library does, are in `utils/genres.ts`.
 
+**Lockfiles must resolve from `registry.npmjs.org`.** This machine's npm is configured for a
+private mirror, which a new dependency's `resolved` URL can pick up; CI has no login for it
+and `npm ci` fails with E401. npm swaps the public host for the configured registry when
+installing, so public URLs work here too. `grep -c resolved.*npmjs.org` should match every entry.
+
 **`primeicons` is a separate package** and must stay listed in `package.json`.
 
 **`@primevue/themes` 4.5.x** is deprecated upstream but the Aura theme still works; do not
