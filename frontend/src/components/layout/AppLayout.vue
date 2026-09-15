@@ -44,6 +44,7 @@ useLaunchActions()
 const { pending: pendingPrefix } = useKeySequence('g', {
   q: () => router.push('/queue'),
   l: () => router.push('/library'),
+  a: () => router.push('/artists'),
   s: () => router.push('/stats'),
   i: () => router.push('/info')
 })

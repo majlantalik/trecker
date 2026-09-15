@@ -1,5 +1,6 @@
 //! Repository layer. Replaces `ReleaseService`, `GenreService` and `StatsService`.
 
+pub mod artists;
 pub mod filter;
 pub mod releases;
 pub mod stats;

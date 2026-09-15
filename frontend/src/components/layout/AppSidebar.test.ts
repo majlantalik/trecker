@@ -5,6 +5,7 @@ import { mount } from '@vue/test-utils'
 vi.mock('@/api/releases', () => ({
   releasesApi: { getAll: vi.fn().mockResolvedValue({ totalElements: 0, content: [] }) }
 }))
+vi.mock('@/api/artists', () => ({ artistsApi: { list: vi.fn().mockResolvedValue([]) } }))
 
 const { default: AppSidebar } = await import('./AppSidebar.vue')
 const { default: router } = await import('@/router')

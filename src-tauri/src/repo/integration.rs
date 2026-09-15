@@ -5,7 +5,7 @@
 //! nothing does: dedup on external ids, genre find-or-create, cascade on delete, the
 //! filter predicates, pagination arithmetic and the date-range maths in the stats.
 
-use super::{releases, stats};
+use super::{artists, releases, stats};
 use crate::db;
 use crate::domain::*;
 use sqlx::SqlitePool;
@@ -815,4 +815,195 @@ async fn genres_from_a_file_reuse_the_ones_already_there() {
 
     assert_eq!(releases::list_genres(&pool).await.unwrap(), vec!["Jazz"],
                "case-insensitive find-or-create, as on every other path");
+}
+
+// ---------------------------------------------------------------- artists
+
+fn artist(mbid: &str, name: &str) -> ArtistMetadata {
+    ArtistMetadata {
+        musicbrainz_artist_id: mbid.into(),
+        name: name.into(),
+        country: Some("US".into()),
+        begin_year: Some(1999),
+        image_url: Some("https://coverartarchive.org/release-group/x/front-250".into()),
+        genres: vec!["heavy metal".into(), "metalcore".into()],
+        links: vec![
+            ArtistLink { kind: "official homepage".into(), url: "https://a.example".into() },
+            ArtistLink { kind: "bandcamp".into(), url: "https://a.bandcamp.com".into() },
+        ],
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn an_added_artist_comes_back_with_genres_and_links_in_order() {
+    let (_d, pool) = fresh().await;
+    let added = artists::add(&pool, artist("mb-1", "Avenged Sevenfold"), Some("  from a friend ".into()))
+        .await
+        .unwrap();
+
+    assert_eq!(added.name, "Avenged Sevenfold");
+    assert_eq!(added.status, ArtistStatus::ToCheck);
+    assert_eq!(added.note.as_deref(), Some("from a friend"));
+    assert_eq!(added.genres, ["heavy metal", "metalcore"]);
+    let urls: Vec<&str> = added.links.iter().map(|l| l.url.as_str()).collect();
+    assert_eq!(urls, ["https://a.example", "https://a.bandcamp.com"]);
+
+    let listed = artists::list(&pool).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, added.id);
+}
+
+#[tokio::test]
+async fn adding_an_artist_again_refreshes_the_catalog_and_keeps_your_note_and_status() {
+    let (_d, pool) = fresh().await;
+    let first = artists::add(&pool, artist("mb-1", "Old Name"), Some("keep me".into())).await.unwrap();
+    artists::update(
+        &pool,
+        &first.id,
+        ArtistUpdateRequest { status: Some(ArtistStatus::Checked), verdict: Some(ArtistVerdict::Liked), ..Default::default() },
+    )
+    .await
+    .unwrap();
+
+    let mut fresher = artist("mb-1", "New Name");
+    fresher.genres = vec!["rock".into()];
+    fresher.image_url = None;
+    let again = artists::add(&pool, fresher, Some("ignored".into())).await.unwrap();
+
+    assert_eq!(again.id, first.id, "one catalog row per MusicBrainz artist");
+    assert_eq!(again.name, "New Name");
+    assert_eq!(again.genres, ["rock"]);
+    assert!(again.image_url.is_some(), "a lookup without a picture keeps the old one");
+    assert_eq!(again.note.as_deref(), Some("keep me"));
+    assert_eq!(again.status, ArtistStatus::Checked);
+    assert_eq!(artists::list(&pool).await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn find_tracked_only_finds_artists_on_your_list() {
+    let (_d, pool) = fresh().await;
+    let a = artists::add(&pool, artist("mb-1", "A"), None).await.unwrap();
+    assert!(artists::find_tracked(&pool, "mb-1").await.unwrap().is_some());
+    assert!(artists::find_tracked(&pool, "mb-2").await.unwrap().is_none());
+
+    artists::delete(&pool, &a.id).await.unwrap();
+    assert!(artists::find_tracked(&pool, "mb-1").await.unwrap().is_none(), "removed from the list");
+    assert!(matches!(artists::get(&pool, &a.id).await, Err(crate::error::AppError::NotFound(_))));
+    assert!(matches!(artists::delete(&pool, &a.id).await, Err(crate::error::AppError::NotFound(_))));
+
+    let back = artists::add(&pool, artist("mb-1", "A"), None).await.unwrap();
+    assert_eq!(back.id, a.id, "the catalog row survived the delete");
+    assert_eq!(back.status, ArtistStatus::ToCheck);
+}
+
+#[tokio::test]
+async fn checking_an_artist_records_when_and_moving_them_back_clears_it() {
+    let (_d, pool) = fresh().await;
+    let a = artists::add(&pool, artist("mb-1", "A"), Some("note".into())).await.unwrap();
+
+    let checked = artists::update(
+        &pool,
+        &a.id,
+        ArtistUpdateRequest { status: Some(ArtistStatus::Checked), verdict: Some(ArtistVerdict::NotForMe), ..Default::default() },
+    )
+    .await
+    .unwrap();
+    assert_eq!(checked.verdict, Some(ArtistVerdict::NotForMe));
+    let when = checked.checked_at.clone().expect("checked_at is set");
+
+    // A new verdict for someone already checked keeps the date.
+    let rejudged = artists::update(
+        &pool,
+        &a.id,
+        ArtistUpdateRequest { status: Some(ArtistStatus::Checked), verdict: Some(ArtistVerdict::Liked), ..Default::default() },
+    )
+    .await
+    .unwrap();
+    assert_eq!(rejudged.verdict, Some(ArtistVerdict::Liked));
+    assert_eq!(rejudged.checked_at.as_deref(), Some(when.as_str()));
+
+    // A note edit alone leaves the status as it is.
+    let noted = artists::update(&pool, &a.id, ArtistUpdateRequest { note: Some("new".into()), ..Default::default() })
+        .await
+        .unwrap();
+    assert_eq!(noted.status, ArtistStatus::Checked);
+    assert_eq!(noted.note.as_deref(), Some("new"));
+
+    let back = artists::update(&pool, &a.id, ArtistUpdateRequest { status: Some(ArtistStatus::ToCheck), ..Default::default() })
+        .await
+        .unwrap();
+    assert_eq!(back.status, ArtistStatus::ToCheck);
+    assert_eq!(back.verdict, None);
+    assert_eq!(back.checked_at, None);
+
+    let cleared = artists::update(&pool, &a.id, ArtistUpdateRequest { note: Some("  ".into()), ..Default::default() })
+        .await
+        .unwrap();
+    assert_eq!(cleared.note, None, "an empty note removes it");
+}
+
+#[tokio::test]
+async fn the_list_puts_artists_to_check_before_checked_ones() {
+    let (_d, pool) = fresh().await;
+    let a = artists::add(&pool, artist("mb-a", "A"), None).await.unwrap();
+    let b = artists::add(&pool, artist("mb-b", "B"), None).await.unwrap();
+    artists::update(&pool, &a.id, ArtistUpdateRequest { status: Some(ArtistStatus::Checked), ..Default::default() })
+        .await
+        .unwrap();
+    let order: Vec<String> = artists::list(&pool).await.unwrap().into_iter().map(|x| x.id).collect();
+    assert_eq!(order, [b.id, a.id]);
+}
+
+#[tokio::test]
+async fn artist_genres_stay_out_of_the_library_genre_list() {
+    let (_d, pool) = fresh().await;
+    artists::add(&pool, artist("mb-1", "A"), None).await.unwrap();
+    assert!(releases::list_genres(&pool).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_discography_is_marked_with_what_you_already_track() {
+    let (_d, pool) = fresh().await;
+    let mut queued = req("Avenged Sevenfold", "Nightmare");
+    queued.musicbrainz_release_group_id = Some("group-nightmare".into());
+    let queued = releases::create(&pool, queued).await.unwrap();
+
+    let mut listened = req("Avenged Sevenfold", "City of Evil");
+    listened.musicbrainz_release_group_id = Some("group-city".into());
+    let listened = releases::create(&pool, listened).await.unwrap();
+    releases::update(
+        &pool,
+        &listened.id,
+        ReleaseUpdateRequest { status: Some(ReleaseStatus::Listened), rating: Some(4.5), ..Default::default() },
+    )
+    .await
+    .unwrap();
+
+    let album = |id: &str| AlbumCandidate {
+        musicbrainz_release_group_id: id.into(),
+        artist: None,
+        title: Some(id.into()),
+        release_year: None,
+        primary_type: Some("Album".into()),
+        secondary_types: vec![],
+        disambiguation: None,
+        album_art_url: String::new(),
+    };
+    let entries = crate::commands::attach_library(
+        &pool,
+        vec![album("group-city"), album("group-other"), album("group-nightmare")],
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        entries[0].library,
+        Some(LibraryMatch { release_id: listened.id, status: ReleaseStatus::Listened, rating: Some(4.5) })
+    );
+    assert_eq!(entries[1].library, None);
+    assert_eq!(
+        entries[2].library,
+        Some(LibraryMatch { release_id: queued.id, status: ReleaseStatus::Queued, rating: None })
+    );
 }

@@ -12,6 +12,7 @@ from the code.
 | [0004](0004-release-group-is-album-identity.md) | The MusicBrainz release group is an album's identity | Accepted |
 | [0005](0005-library-export-format.md) | Library export format | Accepted |
 | [0006](0006-sync-deferred-backend-frozen.md) | Sync is deferred, and the old backend is frozen | Accepted |
+| [0007](0007-artists-to-check.md) | Artists to check are a second kind of entity | Accepted |
 
 ## What does not belong here
 

@@ -27,14 +27,14 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 
-const API: &str = "https://musicbrainz.org/ws/2";
+pub(super) const API: &str = "https://musicbrainz.org/ws/2";
 
 /// MusicBrainz country codes that are not countries.
 ///
 /// `XW` is "worldwide" and `XE` is "Europe". Both are correct answers to "where was this
 /// released" and useless answers to "where is this music from", which is what a By
 /// Country chart is actually asking. Treated as absent so the artist's area can fill in.
-fn is_real_country(code: &str) -> bool {
+pub(super) fn is_real_country(code: &str) -> bool {
     !matches!(code, "XW" | "XE" | "XU" | "ZZ" | "")
 }
 
@@ -56,7 +56,7 @@ impl Resolver {
         *last = Some(std::time::Instant::now());
     }
 
-    async fn mb_get(&self, url: &str) -> Option<Value> {
+    pub(super) async fn mb_get(&self, url: &str) -> Option<Value> {
         let mut attempt = 0;
         loop {
             // Inside the loop: a retry is a new request and must wait its turn like any
@@ -245,7 +245,7 @@ fn pick_release_group(hits: &[Value]) -> Option<&Value> {
 
 /// A search hit as a candidate for the list. None for a hit with no id, which could not be
 /// looked up once chosen.
-fn read_candidate(group: &Value) -> Option<AlbumCandidate> {
+pub(super) fn read_candidate(group: &Value) -> Option<AlbumCandidate> {
     let basics = read_release_group(group);
     let id = basics.musicbrainz_release_group_id?;
     Some(AlbumCandidate {
@@ -325,7 +325,7 @@ fn split_artist_title(text: &str) -> Option<(&str, &str)> {
 
 /// Words with at least one letter or digit. A lone dash or ampersand is not something an
 /// artist or title can be required to contain.
-fn searchable_words(text: &str) -> Vec<&str> {
+pub(super) fn searchable_words(text: &str) -> Vec<&str> {
     text.split_whitespace()
         .filter(|w| w.chars().any(char::is_alphanumeric))
         .collect()
@@ -383,7 +383,7 @@ fn artist_country(group: &Value) -> Option<String> {
 
 /// Takes the most-voted genres, capped so a heavily tagged album does not arrive with
 /// thirty of them.
-fn collect_genres(value: Option<&Value>) -> Vec<String> {
+pub(super) fn collect_genres(value: Option<&Value>) -> Vec<String> {
     let Some(list) = value.and_then(Value::as_array) else {
         return Vec::new();
     };
@@ -404,7 +404,7 @@ fn collect_genres(value: Option<&Value>) -> Vec<String> {
 /// The Java interpolated user text straight into the query, so a title containing a
 /// quote or a colon silently produced a malformed search and no results. "Alien Lanes
 /// (Deluxe)" or an album with a `:` in it would both have hit this.
-fn escape_lucene(input: &str) -> String {
+pub(super) fn escape_lucene(input: &str) -> String {
     const SPECIAL: &[char] = &[
         '\\', '+', '-', '!', '(', ')', ':', '^', '[', ']', '"', '{', '}', '~', '*', '?', '|', '&',
         '/',
@@ -421,7 +421,7 @@ fn escape_lucene(input: &str) -> String {
 
 /// Percent-encodes a query-string value. Only a handful of characters matter here and
 /// pulling in a URL crate for them is not worth the dependency.
-fn urlencode(input: &str) -> String {
+pub(super) fn urlencode(input: &str) -> String {
     let mut out = String::with_capacity(input.len() * 2);
     for byte in input.as_bytes() {
         match byte {

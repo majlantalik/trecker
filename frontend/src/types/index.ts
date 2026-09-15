@@ -159,10 +159,81 @@ export interface CoverCacheInfo {
 /** What closing the main window does. */
 export type CloseAction = 'quit' | 'tray'
 
-/** Preferences for how the app behaves on this machine. Not part of the library. */
+/** The queue's order, by the date each album was added. */
 export type QueueSort = 'newest' | 'oldest'
 
+/** Preferences for how the app behaves on this machine. Not part of the library. */
 export interface Settings {
   closeAction: CloseAction
   queueSort: QueueSort
+}
+
+export type ArtistStatus = 'TO_CHECK' | 'CHECKED'
+export type ArtistVerdict = 'LIKED' | 'NOT_FOR_ME'
+
+export interface ArtistLink {
+  /** MusicBrainz's relationship type, such as "official homepage" or "bandcamp". */
+  kind: string
+  url: string
+}
+
+/** An artist on your list. `id` is the catalog artist id. */
+export interface Artist {
+  id: string
+  musicbrainzArtistId: string | null
+  name: string
+  disambiguation: string | null
+  /** Group, Person, Orchestra, Choir, Character or Other. */
+  artistType: string | null
+  country: string | null
+  beginYear: number | null
+  endYear: number | null
+  /** The cover of one of their albums; MusicBrainz has no artist photos. */
+  imageUrl: string | null
+  genres: string[]
+  links: ArtistLink[]
+  status: ArtistStatus
+  verdict: ArtistVerdict | null
+  note: string | null
+  checkedAt: string | null
+  createdAt: string
+}
+
+/** One match for an artist search. */
+export interface ArtistCandidate {
+  musicbrainzArtistId: string
+  name: string
+  disambiguation: string | null
+  artistType: string | null
+  country: string | null
+  beginYear: number | null
+  endYear: number | null
+  tags: string[]
+}
+
+export interface ArtistAddRequest {
+  musicbrainzArtistId: string
+  note?: string
+}
+
+/**
+ * An absent field is left alone. Whenever `status` is sent, `verdict` is taken as given, so
+ * leaving it out clears it. An empty `note` removes the note.
+ */
+export interface ArtistUpdateRequest {
+  note?: string
+  status?: ArtistStatus
+  verdict?: ArtistVerdict | null
+}
+
+/** Where an album from a discography already is in your library. */
+export interface LibraryMatch {
+  releaseId: string
+  status: ReleaseStatus
+  rating: number | null
+}
+
+/** One album or EP of an artist's discography. */
+export interface DiscographyEntry extends AlbumCandidate {
+  library: LibraryMatch | null
 }

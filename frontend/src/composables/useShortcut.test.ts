@@ -104,11 +104,11 @@ describe('the shortcut catalogue', () => {
     // The catalogue says "Go to Queue"; if the route moved, the help would lie. This is
     // the same class of drift the Settings-to-Info rename could have caused.
     const routes = router.getRoutes().map((r) => r.path)
-    for (const path of ['/queue', '/library', '/stats', '/info']) {
+    for (const path of ['/queue', '/library', '/artists', '/stats', '/info']) {
       expect(routes).toContain(path)
     }
     const navKeys = SHORTCUTS.filter((s) => s.group === 'Navigation').map((s) => s.keys[1])
-    expect(navKeys).toEqual(['Q', 'L', 'S', 'I'])
+    expect(navKeys).toEqual(['Q', 'L', 'A', 'S', 'I'])
   })
 
   it('describes every shortcut', () => {

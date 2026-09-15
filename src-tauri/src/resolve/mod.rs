@@ -17,10 +17,11 @@
 //! Every lookup is of a release group, never a single release. `musicbrainz.rs` explains
 //! why, and why that word never reaches the interface.
 
+pub mod artists;
 pub mod coverart;
 pub mod musicbrainz;
 
-use crate::domain::{AlbumCandidate, ResolveRequest, ResolvedMetadata};
+use crate::domain::{AlbumCandidate, ArtistCandidate, ArtistMetadata, ResolveRequest, ResolvedMetadata};
 use crate::error::{AppError, AppResult};
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
@@ -137,6 +138,48 @@ impl Resolver {
         .map_err(|_| AppError::Resolve("lookup timed out".into()))
     }
 
+    /// Artists matching typed text, for the person to choose from.
+    pub async fn search_artists(&self, query: &str) -> AppResult<Vec<ArtistCandidate>> {
+        let query = query.trim();
+        if query.is_empty() {
+            return Err(AppError::Invalid("nothing to search for".into()));
+        }
+        tokio::time::timeout(TOTAL_BUDGET, self.mb_search_artists(query, SEARCH_RESULTS))
+            .await
+            .map_err(|_| AppError::Resolve("search timed out".into()))?
+            .ok_or_else(|| AppError::Resolve("could not reach MusicBrainz".into()))
+    }
+
+    /// Everything kept about an artist: the lookup, and a picture from their discography.
+    ///
+    /// The lookup must succeed, since it is the artist. The discography is only for the
+    /// picture, so if it fails the artist is still added, without one.
+    pub async fn lookup_artist(&self, musicbrainz_artist_id: &str) -> AppResult<ArtistMetadata> {
+        let id = checked_artist_id(musicbrainz_artist_id)?;
+        tokio::time::timeout(TOTAL_BUDGET, async {
+            let mut artist = self
+                .mb_artist(id)
+                .await
+                .ok_or_else(|| AppError::Resolve("could not look the artist up on MusicBrainz".into()))?;
+            if let Some(groups) = self.mb_artist_release_groups(id).await {
+                artist.image_url = artists::pick_image(&groups);
+            }
+            Ok(artist)
+        })
+        .await
+        .map_err(|_| AppError::Resolve("lookup timed out".into()))?
+    }
+
+    /// An artist's albums and EPs, oldest first.
+    pub async fn artist_discography(&self, musicbrainz_artist_id: &str) -> AppResult<Vec<AlbumCandidate>> {
+        let id = checked_artist_id(musicbrainz_artist_id)?;
+        let groups = tokio::time::timeout(TOTAL_BUDGET, self.mb_artist_release_groups(id))
+            .await
+            .map_err(|_| AppError::Resolve("the discography took too long".into()))?
+            .ok_or_else(|| AppError::Resolve("could not reach MusicBrainz".into()))?;
+        Ok(artists::discography(&groups))
+    }
+
     /// Overlays the group lookup and the cover onto what is already known. Both are
     /// best-effort: an album with no artwork and no tags is still a perfectly good result.
     async fn fill_out(&self, id: &str, mut result: ResolvedMetadata) -> ResolvedMetadata {
@@ -152,6 +195,15 @@ impl Resolver {
         }
         result.album_art_url = self.cover_art(id).await;
         result
+    }
+}
+
+fn checked_artist_id(id: &str) -> AppResult<&str> {
+    let id = id.trim();
+    if artists::is_mbid(id) {
+        Ok(id)
+    } else {
+        Err(AppError::Invalid("not a MusicBrainz artist id".into()))
     }
 }
 
@@ -412,6 +464,55 @@ mod tests {
         assert_eq!(found[0].title.as_deref(), Some("Nightmare"));
         assert_eq!(found[0].primary_type.as_deref(), Some("Album"));
         assert!(found.len() <= SEARCH_RESULTS);
+    }
+
+    #[tokio::test]
+    #[ignore = "makes real network requests"]
+    async fn finds_an_artist_by_name() {
+        let r = Resolver::new("0.1.0-test");
+        let found = r.search_artists("avenged sevenfold").await.unwrap();
+        println!("{found:#?}");
+        let first = &found[0];
+        assert_eq!(first.name, "Avenged Sevenfold");
+        assert_eq!(first.musicbrainz_artist_id, "24e1b53c-3085-4581-8472-0b0088d2508c");
+        assert_eq!(first.country.as_deref(), Some("US"));
+        assert_eq!(first.begin_year, Some(1999));
+    }
+
+    /// The lookup and the browse together: genres, links, and a picture from the first
+    /// studio album, Sounding the Seventh Trumpet.
+    #[tokio::test]
+    #[ignore = "makes real network requests"]
+    async fn looks_an_artist_up_with_genres_links_and_a_picture() {
+        let r = Resolver::new("0.1.0-test");
+        let artist = r.lookup_artist("24e1b53c-3085-4581-8472-0b0088d2508c").await.unwrap();
+        println!("{artist:#?}");
+        assert_eq!(artist.name, "Avenged Sevenfold");
+        assert!(!artist.genres.is_empty());
+        assert!(artist.links.iter().any(|l| l.kind == "official homepage"), "{:#?}", artist.links);
+        assert!(artist.links.iter().all(|l| l.url.starts_with("http")));
+        let image = artist.image_url.expect("a picture from a studio album");
+        assert!(image.starts_with("https://coverartarchive.org/release-group/"), "{image}");
+    }
+
+    #[tokio::test]
+    #[ignore = "makes real network requests"]
+    async fn a_discography_lists_albums_and_eps_oldest_first() {
+        let r = Resolver::new("0.1.0-test");
+        let albums = r.artist_discography("24e1b53c-3085-4581-8472-0b0088d2508c").await.unwrap();
+        let titles: Vec<&str> = albums.iter().filter_map(|a| a.title.as_deref()).collect();
+        println!("{titles:#?}");
+        let position = |t: &str| titles.iter().position(|x| *x == t).unwrap_or_else(|| panic!("{t} missing"));
+        assert!(position("Waking the Fallen") < position("City of Evil"));
+        assert!(position("City of Evil") < position("Nightmare"));
+        assert!(albums.iter().all(|a| matches!(a.primary_type.as_deref(), Some("Album" | "EP"))));
+    }
+
+    #[tokio::test]
+    async fn an_artist_id_that_is_not_one_makes_no_request() {
+        let r = Resolver::new("0.1.0-test");
+        assert!(matches!(r.artist_discography("../release-group?x").await, Err(AppError::Invalid(_))));
+        assert!(matches!(r.lookup_artist("").await, Err(AppError::Invalid(_))));
     }
 
     /// An extra word empties the precise query. The loose fallback still has to find it.

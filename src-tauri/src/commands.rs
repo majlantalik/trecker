@@ -352,6 +352,89 @@ pub async fn cache_webview_clear(window: tauri::WebviewWindow) -> AppResult<()> 
         .map_err(|e| AppError::Internal(format!("could not clear webview data: {e}")))
 }
 
+// ---------------------------------------------------------------- artists
+
+/// Up to ten artists matching what was typed.
+#[tauri::command]
+pub async fn artists_search(
+    resolver: State<'_, Resolver>,
+    query: String,
+) -> AppResult<Vec<ArtistCandidate>> {
+    resolver.search_artists(&query).await
+}
+
+/// Puts an artist chosen from a search on your list, looking them up first.
+#[tauri::command]
+pub async fn artists_add(
+    db: State<'_, Db>,
+    resolver: State<'_, Resolver>,
+    request: ArtistAddRequest,
+) -> AppResult<Artist> {
+    // Already there: no need to spend two MusicBrainz requests to learn the same thing.
+    if let Some(existing) = repo::artists::find_tracked(&db.pool, &request.musicbrainz_artist_id).await? {
+        return Ok(existing);
+    }
+    let found = resolver.lookup_artist(&request.musicbrainz_artist_id).await?;
+    repo::artists::add(&db.pool, found, request.note).await
+}
+
+#[tauri::command]
+pub async fn artists_list(db: State<'_, Db>) -> AppResult<Vec<Artist>> {
+    repo::artists::list(&db.pool).await
+}
+
+#[tauri::command]
+pub async fn artists_get(db: State<'_, Db>, id: String) -> AppResult<Artist> {
+    repo::artists::get(&db.pool, &id).await
+}
+
+#[tauri::command]
+pub async fn artists_update(
+    db: State<'_, Db>,
+    id: String,
+    request: ArtistUpdateRequest,
+) -> AppResult<Artist> {
+    repo::artists::update(&db.pool, &id, request).await
+}
+
+#[tauri::command]
+pub async fn artists_delete(db: State<'_, Db>, id: String) -> AppResult<()> {
+    repo::artists::delete(&db.pool, &id).await
+}
+
+/// An artist's albums and EPs from MusicBrainz, each marked with where it already is in your
+/// library.
+#[tauri::command]
+pub async fn artists_discography(
+    db: State<'_, Db>,
+    resolver: State<'_, Resolver>,
+    id: String,
+) -> AppResult<Vec<DiscographyEntry>> {
+    let artist = repo::artists::get(&db.pool, &id).await?;
+    let mbid = artist
+        .musicbrainz_artist_id
+        .ok_or_else(|| AppError::Invalid("this artist has no MusicBrainz id".into()))?;
+    let albums = resolver.artist_discography(&mbid).await?;
+    attach_library(&db.pool, albums).await
+}
+
+/// Marks each album with your library's copy of it. Separate from the command so it can be
+/// tested without the network.
+pub async fn attach_library(
+    pool: &sqlx::SqlitePool,
+    albums: Vec<AlbumCandidate>,
+) -> AppResult<Vec<DiscographyEntry>> {
+    let ids: Vec<String> = albums.iter().map(|a| a.musicbrainz_release_group_id.clone()).collect();
+    let mut matches = repo::artists::library_matches(pool, &ids).await?;
+    Ok(albums
+        .into_iter()
+        .map(|album| DiscographyEntry {
+            library: matches.remove(&album.musicbrainz_release_group_id),
+            album,
+        })
+        .collect())
+}
+
 // ---------------------------------------------------------------- settings and desktop
 
 #[tauri::command]

@@ -181,6 +181,9 @@ reading is deliberately more generous than writing:
 - **Catalog rows you no longer track.** Deleting a release keeps its catalog entry, which
   is an implementation detail of the two-table split, not part of your library.
 - **The full-text index**, which is derived and rebuilt by the triggers on insert.
+- **Artists to check.** Not yet part of the format. Adding them is a version change: a new
+  top-level list in JSON, and a separate file or no support in CSV, which holds one kind of
+  row. See [ADR 0007](adr/0007-artists-to-check.md).
 - **Album artwork itself.** Only the URL. Artwork is tens of megabytes for a modest
   library and the Cover Art Archive is a better custodian of it than a backup file. The
   consequence is that a restored library shows no art for any release whose URL has since

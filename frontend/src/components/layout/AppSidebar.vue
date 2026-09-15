@@ -23,6 +23,13 @@
         </RouterLink>
       </li>
       <li>
+        <RouterLink to="/artists" class="nav-link" active-class="active">
+          <i class="pi pi-users nav-icon" />
+          <span class="nav-label">Artists</span>
+          <span v-if="artistCount > 0" class="nav-badge">{{ artistCount }}</span>
+        </RouterLink>
+      </li>
+      <li>
         <RouterLink to="/stats" class="nav-link" active-class="active">
           <i class="pi pi-chart-bar nav-icon" />
           <span class="nav-label">Stats</span>
@@ -66,6 +73,7 @@
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useReleasesStore } from '@/stores/releases'
+import { useArtistsStore } from '@/stores/artists'
 import { useShortcutsHelp } from '@/composables/useShortcutsHelp'
 
 const releasesStore = useReleasesStore()
@@ -75,8 +83,12 @@ const { show: showShortcuts } = useShortcutsHelp()
 // badge used to show the Library count while sitting next to the word "Queue".
 const queueCount = computed(() => releasesStore.queuedTotal)
 
+const artistsStore = useArtistsStore()
+const artistCount = computed(() => artistsStore.toCheck.length)
+
 onMounted(() => {
   releasesStore.refreshQueuedCount()
+  if (!artistsStore.loaded) artistsStore.fetchArtists()
 })
 </script>
 

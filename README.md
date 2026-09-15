@@ -85,6 +85,27 @@ Everything you have listened to, as a table or a grid. Filter by free-text searc
 genre, country, year, rating range and the did-not-finish flag. Countries show as flags
 and names, and the country filter offers only the ones you actually have.
 
+### Artists
+
+A backlog of artists to check out, separate from the queue: someone a friend mentioned, a
+band from a festival line-up, with no particular album in mind yet.
+
+- **Find** searches MusicBrainz. Choose the right artist from the list, which tells
+  same-named artists apart, and they join your list with their country, active years,
+  genres and links. Their picture is the cover of their first album, when it has one.
+- An artist's page has a **note** for who recommended them or where to start, links that
+  open in your browser, and their **discography** of albums and EPs, oldest first. Live
+  albums and compilations are hidden until you ask for them.
+- Each album shows whether it is already **In queue** or **Listened**. **Queue** opens the
+  add form filled in; **Log** opens the log dialog, and closing it without logging leaves
+  nothing behind.
+- When you are done, choose **Into it**, **Not for me** or **Just checked**. Checked artists
+  move to a collapsed section at the bottom of the list, and **Back to the list** undoes it.
+
+The discography is fetched from MusicBrainz each time you open the page, so it needs a
+connection; everything else works offline. Why artists work this way:
+[ADR 0007](docs/adr/0007-artists-to-check.md).
+
 ### Stats
 
 Listening activity by month, breakdowns by genre and country, your top-rated releases, and
@@ -143,6 +164,8 @@ clear the temporary files kept by the browser engine the app runs in.
 - **JSON** is the complete record and the one to keep for a backup or a move to another
   machine.
 - **CSV** holds the same releases in a shape a spreadsheet can read. It round-trips too.
+
+Artists to check are not exported yet; a backup covers releases only.
 
 Neither carries the album artwork itself, only the address it lives at, so a library
 restored years later shows no art for any release whose URL has rotted. Refreshing metadata
@@ -217,9 +240,9 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 149 frontend tests
-npm run test:rust  # 148 Rust tests
-npm run test:net   # 11 tests against the live metadata services
+npm test           # 188 frontend tests
+npm run test:rust  # 166 Rust tests
+npm run test:net   # 14 tests against the live metadata services
 ```
 
 The Rust integration tests run against a real temporary SQLite file through the real
@@ -233,10 +256,11 @@ trecker/
 ├── package.json              workspace root; owns the Tauri scripts
 ├── frontend/                 Vue 3 application
 │   └── src/
-│       ├── api/              releases.ts, genres.ts, stats.ts, info.ts,
-│       │                     library.ts, dialog.ts, cache.ts
+│       ├── api/              releases.ts, artists.ts, genres.ts, stats.ts, info.ts,
+│       │                     library.ts, dialog.ts, cache.ts, settings.ts, app.ts
 │       │                     the only place that knows about Tauri
 │       ├── components/
+│       │   ├── artist/       ArtistCard, ArtistAvatar, ArtistPicker
 │       │   ├── layout/       AppLayout, AppSidebar
 │       │   ├── library/      LibraryFilters, ViewToggle
 │       │   ├── queue/        QueueActions
@@ -244,9 +268,10 @@ trecker/
 │       │   │                 QuickLogModal, GenreTagInput
 │       │   └── stats/        ActivityChart, BreakdownChart, TopRatedList, YearEndList
 │       ├── composables/      keyboard shortcuts, useLibraryTransfer, useCaches
-│       ├── stores/           releases.ts, genres.ts, stats.ts (Pinia)
+│       ├── stores/           releases.ts, artists.ts, genres.ts, stats.ts (Pinia)
 │       ├── types/index.ts    single source of truth for TS interfaces
-│       └── views/            QueueView, LibraryView, StatsView, EntryView, InfoView
+│       └── views/            QueueView, LibraryView, ArtistsView, ArtistView,
+│                             StatsView, EntryView, InfoView, SettingsView
 ├── src-tauri/                Rust core
 │   ├── migrations/           sqlx migrations
 │   ├── tauri.conf.json
@@ -271,7 +296,7 @@ Art Archive are open, and everything else is local.
 
 ### Command surface
 
-Twenty-eight Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
+Thirty-five Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
 | Command | Purpose |
 |---|---|
@@ -286,6 +311,13 @@ Twenty-eight Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `releases_delete` | Stop tracking; the catalog row stays |
 | `releases_refresh_metadata` | Re-fetch catalog fields for an existing release |
 | `releases_search_catalog` | Full-text autocomplete over the catalog |
+| `artists_search` | Up to ten artists matching typed text |
+| `artists_add` | Look an artist up and put them on your list |
+| `artists_list` | Your artists, those to check first |
+| `artists_get` | Fetch one artist |
+| `artists_update` | Change the note, or mark checked with a verdict |
+| `artists_delete` | Take an artist off your list; the catalog row stays |
+| `artists_discography` | Their albums and EPs, marked with your library's copies |
 | `genres_list` | Every known genre |
 | `countries_list` | Countries present in the library, for the filter |
 | `stats_activity` | Listening count by year and month |
@@ -318,6 +350,8 @@ release group: [ADR 0004](docs/adr/0004-release-group-is-album-identity.md).
 
 - `releases` — deduplicated catalog, keyed by the album's MusicBrainz release group.
 - `user_releases` — status, rating, notes, dates. Deleting one leaves the catalog row.
+- `artists` and `user_artists` — the same split for artists to check, keyed by the
+  MusicBrainz artist id. Why: [ADR 0007](docs/adr/0007-artists-to-check.md).
 
 The `id` in an API response is the catalog release id; `createdAt` is from the tracking
 row, meaning when you added it.
@@ -353,4 +387,7 @@ one, create `NNNN_description.sql`. There is no master file to register it in.
 - [x] Keyboard shortcuts (in-app)
 - [x] Quick add from anywhere, through a desktop shortcut running `trecker --quick-add`
 - [x] Keep running in the tray on close, as a setting
+- [x] Artists to check, with their discography ([ADR 0007](docs/adr/0007-artists-to-check.md))
+- [ ] Artists in the export
+- [ ] Add an artist to check from an album's page
 - [ ] Mobile

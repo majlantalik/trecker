@@ -44,6 +44,12 @@ export const SHORTCUTS: Shortcut[] = [
     sequence: true
   },
   {
+    keys: ['G', 'A'],
+    description: 'Go to Artists',
+    group: 'Navigation',
+    sequence: true
+  },
+  {
     keys: ['G', 'S'],
     description: 'Go to Stats',
     group: 'Navigation',

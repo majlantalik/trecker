@@ -20,6 +20,9 @@ pub fn run() {
             desktop::on_second_instance(app, args);
         }))
         .plugin(tauri_plugin_dialog::init())
+        // Opens `<a target="_blank">` links in the default browser. WebKitGTK ignores a request
+        // for a new window unless something handles it, so without this every link did nothing.
+        .plugin(tauri_plugin_opener::init())
         // Every album cover the webview shows comes through here. See `covers.rs`.
         .register_asynchronous_uri_scheme_protocol(covers::SCHEME, |ctx, request, responder| {
             let app = ctx.app_handle().clone();
@@ -85,6 +88,13 @@ pub fn run() {
             commands::stats_by_country,
             commands::stats_top_rated,
             commands::stats_year_end,
+            commands::artists_search,
+            commands::artists_add,
+            commands::artists_list,
+            commands::artists_get,
+            commands::artists_update,
+            commands::artists_delete,
+            commands::artists_discography,
             commands::info_db,
             commands::library_export,
             commands::library_import,

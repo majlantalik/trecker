@@ -23,7 +23,7 @@ npm run build:fast     # debug .deb, for when you need something installable now
 npm run build:nobundle # binary only
 npm test               # frontend tests
 npm run test:rust      # Rust tests
-npm run test:net       # the eleven network tests, excluded from test:rust
+npm run test:net       # the fourteen network tests, excluded from test:rust
 ```
 
 ### Build times
@@ -58,11 +58,11 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-148 Rust tests and 149 frontend tests. The Rust integration tests in
+166 Rust tests and 188 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
-Eleven further tests hit the live MusicBrainz and Cover Art Archive services and are
+Fourteen further tests hit the live MusicBrainz and Cover Art Archive services and are
 excluded from normal runs. `npm run test:net` runs them, and passes `--test-threads=1`,
 which is required: the MusicBrainz rate limiter lives on the `Resolver`, each test builds
 its own, and parallel runs trip the limit and get a 503.
@@ -77,7 +77,7 @@ frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api
 src-tauri/    The Rust core.
   migrations/ sqlx migrations, replacing Liquibase
   src/
-    commands.rs   the #[tauri::command] surface, 28 commands
+    commands.rs   the #[tauri::command] surface, 35 commands
     covers.rs     the on-disk cover cache and the cover: protocol
     desktop.rs    --quick-add, the tray, and what closing the window does
     settings.rs   this computer's preferences, as a JSON file
@@ -86,7 +86,7 @@ src-tauri/    The Rust core.
     error.rs      AppError, serialized to the frontend as { code, message }
     library/      the export and import file format; no SQL, no Tauri
     repo/         sqlx queries; filter.rs is the UserReleaseSpecification port
-    resolve/      MusicBrainz + Cover Art Archive
+    resolve/      MusicBrainz + Cover Art Archive; artists.rs for artists
 backend/      FROZEN. Spring Boot, kept only for a future sync server.
 docs/adr/     architecture decision records
 ```
@@ -157,6 +157,30 @@ The rules that follow:
   by searching its artist and title.
 - **"Release group" never reaches the interface.** The UI says album and the export field
   stays `musicbrainzId`. Code, schema and developer docs use the precise term.
+
+### Artists to check
+
+A second kind of entity beside releases, with the same catalog and tracking split:
+`artists` keyed by `musicbrainz_artist_id`, `user_artists` holding status, verdict and note.
+Why: [ADR 0007](docs/adr/0007-artists-to-check.md).
+
+- **The discography is fetched, never stored.** `artists_discography` browses MusicBrainz
+  each time the page opens and marks each album from `library_matches`, which joins on
+  `musicbrainz_release_group_id`. Do not add a discography table.
+- **Artist genres live in `artist_genres`, not `genres`.** `genres` feeds the Library filter
+  and the stats, which are about albums. A test asserts an artist's genres stay out of
+  `genres_list`.
+- **Queueing and logging from a discography go through the album path**, `releases_lookup`
+  then `releases_create`, in `useDiscography`. There is no artist-specific way to create a
+  release. Browse results carry no artist credit, so the artist's name fills it in.
+- **A log started from the discography removes its release if the dialog closes unlogged.**
+  Only a release that the log itself created; never one that was already queued.
+- **Artist ids from the frontend are checked with `is_mbid` before any request,** because
+  they go into a URL path.
+- **An artist's picture is an album cover URL,** so it goes through `coverSrc()` like every
+  other cover.
+- **Artists are not in the export.** Adding them is a format change; update
+  `docs/export-format.md` first.
 
 ### Album covers
 
@@ -277,6 +301,11 @@ this machine, so shortcuts cannot be verified that way. `press-key` reports succ
 nothing happens, for modifier and function keys alike. Cover the logic with unit tests and
 have a human press the keys.
 
+**External links are plain `<a href target="_blank">`.** `tauri-plugin-opener` intercepts the
+click and opens the default browser, which the capability limits to http, https, mailto and
+tel. Without it WebKitGTK opens nothing, silently. Do not import the opener's JavaScript
+into views; the anchor is enough, and the seam stays in `@/api/`.
+
 **`@/api/` is the only place that imports Tauri.** `dialog.ts` wraps the file pickers for
 the same reason the others wrap `invoke`: the views and stores stay ordinary Vue and the
 seam stays one directory wide.
@@ -331,7 +360,16 @@ Windows, `~/Library/Application Support` on macOS.
 To add a migration, drop `NNNN_description.sql` into `src-tauri/migrations/`. sqlx picks it
 up by filename order; there is no master file to edit.
 
-Current: `0001_initial.sql`.
+Current: `0001_initial.sql`, `0002_artists.sql`.
+
+**Never edit a migration that has shipped.** `0001` was edited in place before anyone else had
+a database. Now that installed copies exist, a changed or missing migration stops the app
+at startup, because sqlx checks each applied migration's checksum.
+
+**An older build refuses a newer database.** Once a build with a new migration has opened a
+database, a build without that migration fails at startup, because the database holds a
+migration it does not know. `npm run dev` and an installed package share one database, so
+reinstall the package after running a dev build with a new migration.
 
 **Known limitation:** the FTS tokenizer folds accents but not ligatures, so `ros` finds
 *Sigur Rós* while `agaetis` does not find *Ágætis byrjun*. That is unicode61 as documented.
@@ -349,3 +387,17 @@ On Wayland, screenshots need a desktop portal grant that is not available to aut
 and keyboard input needs window focus that cannot be taken. The accessibility tree is the
 reliable channel — values render into it from `<p>` elements but not from `<div>`s, which
 is why the Settings rows are paragraphs.
+
+**Test against a throwaway database, not the real one.** Tauri resolves its directories from
+the XDG variables, so this runs a build with its own data, settings and cover cache, and
+leaves the library and its schema version alone:
+
+```bash
+d=$(mktemp -d); XDG_DATA_HOME=$d/data XDG_CONFIG_HOME=$d/config XDG_CACHE_HOME=$d/cache \
+  src-tauri/target/release/trecker
+```
+
+Text cannot be typed into the webview from automation, so seed what a test needs straight
+into `$d/data/cz.mtulek.trecker/trecker.db` with Python's `sqlite3` module; there is no
+`sqlite3` binary. Clicks through `perform-secondary-action ... --action jump` on links and
+`click --element-index` on buttons do work.

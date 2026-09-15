@@ -17,6 +17,7 @@ const { libraryApi } = await import('./library')
 const { cacheApi, coverSrc } = await import('./cache')
 const { settingsApi } = await import('./settings')
 const { appApi } = await import('./app')
+const { artistsApi } = await import('./artists')
 
 beforeEach(() => {
   invoke.mockReset()
@@ -94,6 +95,42 @@ describe('releases commands', () => {
   it('searchCatalog applies the default limit', async () => {
     await releasesApi.searchCatalog('slint')
     expect(invoke).toHaveBeenCalledWith('releases_search_catalog', { q: 'slint', limit: 10 })
+  })
+})
+
+describe('artists commands', () => {
+  it('search sends the typed text as "query"', async () => {
+    await artistsApi.search('avenged sevenfold')
+    expect(invoke).toHaveBeenCalledWith('artists_search', { query: 'avenged sevenfold' })
+  })
+
+  it('add sends the request as "request"', async () => {
+    await artistsApi.add({ musicbrainzArtistId: 'mb', note: 'from a friend' })
+    expect(invoke).toHaveBeenCalledWith('artists_add', {
+      request: { musicbrainzArtistId: 'mb', note: 'from a friend' }
+    })
+  })
+
+  it('list takes no arguments', async () => {
+    await artistsApi.list()
+    expect(invoke).toHaveBeenCalledWith('artists_list')
+  })
+
+  it('get, delete and discography send "id"', async () => {
+    await artistsApi.get('a1')
+    expect(invoke).toHaveBeenCalledWith('artists_get', { id: 'a1' })
+    await artistsApi.delete('a1')
+    expect(invoke).toHaveBeenCalledWith('artists_delete', { id: 'a1' })
+    await artistsApi.discography('a1')
+    expect(invoke).toHaveBeenCalledWith('artists_discography', { id: 'a1' })
+  })
+
+  it('update sends "id" and "request"', async () => {
+    await artistsApi.update('a1', { status: 'CHECKED', verdict: 'LIKED' })
+    expect(invoke).toHaveBeenCalledWith('artists_update', {
+      id: 'a1',
+      request: { status: 'CHECKED', verdict: 'LIKED' }
+    })
   })
 })
 
