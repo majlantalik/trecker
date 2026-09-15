@@ -70,6 +70,14 @@ its own, and parallel runs trip the limit and get a 503.
 Run them after touching `resolve/`. Every bug in that module so far was found this way and
 by none of the offline tests.
 
+`npm --prefix frontend run test:coverage` writes `frontend/coverage/lcov.info`.
+
+**SonarQube Cloud analyses every push to `main` and every pull request** through
+`.github/workflows/sonarqube.yml`, configured in `sonar-project.properties`. It runs both test
+suites with coverage first: Vitest, then the Rust tests under `cargo-llvm-cov`. Sonar runs
+Clippy itself from `sonar.rust.cargo.manifestPaths`. The repository's Automatic Analysis
+must stay off in SonarQube Cloud, or the two analyses conflict. `backend/` is excluded.
+
 ## Architecture
 
 ```

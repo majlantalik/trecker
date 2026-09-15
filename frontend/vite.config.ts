@@ -25,6 +25,13 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
-    setupFiles: ['./src/test-setup.ts']
+    setupFiles: ['./src/test-setup.ts'],
+    // `npm run test:coverage`, which the SonarQube Cloud workflow runs. LCOV is what Sonar reads.
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'lcov'],
+      include: ['src/**/*.{ts,vue}'],
+      exclude: ['src/**/*.test.ts', 'src/test-setup.ts', 'src/**/*.d.ts']
+    }
   }
 })

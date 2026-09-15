@@ -37,3 +37,8 @@ __pycache__/
 # Claude Code worktrees. These hold full build trees; committing one would add
 # gigabytes of target/ and node_modules to history.
 .claude/
+
+# Coverage and analysis reports, written by the SonarQube workflow
+frontend/coverage/
+src-tauri/lcov.info
+.scannerwork/

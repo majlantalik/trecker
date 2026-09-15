@@ -1,0 +1,78 @@
+name: SonarQube Cloud
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# A newer push makes an analysis still running for the same branch pointless.
+concurrency:
+  group: sonarqube-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Test and analyze
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history, so Sonar can attribute issues to commits and tell new code from old.
+          fetch-depth: 0
+
+      # Tauri links against WebKitGTK even for `cargo test`. The same list as CLAUDE.md.
+      - name: Install the webview headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libssl-dev pkg-config
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix frontend
+
+      - name: Frontend tests with coverage
+        working-directory: frontend
+        run: |
+          npm run test:coverage
+          # Vitest writes paths relative to frontend/; Sonar resolves them from the repo root.
+          sed -i 's#^SF:src/#SF:frontend/src/#' coverage/lcov.info
+
+      # `tauri::generate_context!` reads frontend/dist at compile time, so the Rust crate does
+      # not build without it. vite alone: the type check belongs to a build, not an analysis.
+      - name: Build the frontend bundle
+        working-directory: frontend
+        run: npx vite build
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, llvm-tools-preview
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      # `--lib` as in `npm run test:rust`. The network tests are #[ignore]d and stay out.
+      - name: Rust tests with coverage
+        working-directory: src-tauri
+        run: cargo llvm-cov --lib --lcov --output-path lcov.info
+
+      - name: SonarQube Cloud scan
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
