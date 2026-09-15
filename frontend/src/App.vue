@@ -111,6 +111,32 @@ h1, h2, h3, h4 {
   letter-spacing: -0.02em;
 }
 
+/* Text areas grow downwards only. Dragging one wider pushes past the dialog or panel it sits
+   in, and PrimeVue's theme leaves the browser default, which allows both. */
+textarea {
+  resize: vertical;
+}
+
+/*
+ * Suggestion lists that PrimeVue appends to <body>, outside any themed ancestor, so they take
+ * their colours from variables on themselves. Opt in with :pt="{ overlay: { class: 'tk-overlay' } }".
+ */
+.tk-overlay {
+  --p-autocomplete-overlay-background: var(--tk-surface);
+  --p-autocomplete-overlay-border-color: var(--tk-border-hover);
+  --p-autocomplete-overlay-color: var(--tk-text);
+  --p-autocomplete-overlay-border-radius: 10px;
+  --p-autocomplete-overlay-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --p-autocomplete-option-color: var(--tk-text);
+  --p-autocomplete-option-focus-background: var(--tk-surface-hover);
+  --p-autocomplete-option-focus-color: var(--tk-text);
+  --p-autocomplete-option-selected-background: var(--tk-accent-dim);
+  --p-autocomplete-option-selected-color: var(--tk-accent);
+  --p-autocomplete-option-selected-focus-background: var(--tk-accent-dim);
+  --p-autocomplete-option-selected-focus-color: var(--tk-accent);
+  --p-autocomplete-option-border-radius: 6px;
+}
+
 /*
  * Frosted glass behind every modal: the page stays visible but blurred and dimmed, so the
  * dialog reads as a layer above it rather than a hole punched through it.

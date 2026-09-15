@@ -84,7 +84,18 @@
             <i class="pi pi-calendar" />
             Year
           </label>
-          <InputNumber v-model="localFilters.year" placeholder="2024" :min="1900" :max="2099" fluid @input="debouncedEmit" />
+          <!-- A text field, not InputNumber: that one formats 2025 as "2,025" and updates its
+               value only on blur, so a filter reading it while typing was always one edit behind. -->
+          <InputText
+            :model-value="yearText"
+            placeholder="2024"
+            inputmode="numeric"
+            maxlength="4"
+            aria-label="Year"
+            fluid
+            @input="onYearInput"
+            @keydown.enter="applyYearNow"
+          />
         </div>
       </div>
 
@@ -125,7 +136,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import AutoComplete from 'primevue/autocomplete'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
@@ -134,6 +144,7 @@ import { useGenresStore } from '@/stores/genres'
 import CountryLabel from '@/components/common/CountryLabel.vue'
 import { countriesApi } from '@/api/genres'
 import { countryName } from '@/utils/country'
+import { parseYearInput } from '@/utils/year'
 import type { ReleaseFilterParams } from '@/types'
 
 const props = defineProps<{
@@ -165,6 +176,27 @@ const localFilters = ref<ReleaseFilterParams>({
 
 let debounceTimer: ReturnType<typeof setTimeout>
 
+const yearText = ref('')
+
+function onYearInput(event: Event) {
+  const field = event.target as HTMLInputElement
+  const { text, year } = parseYearInput(field.value)
+  // Written back to the field itself: a rejected letter leaves `yearText` unchanged, so Vue
+  // would have nothing to redraw and the letter would stay on screen.
+  field.value = text
+  yearText.value = text
+  // A partial year such as "202" matches nothing, so the list keeps its last filter until the
+  // fourth digit, and an emptied field clears it.
+  if (year === localFilters.value.year || (text && year === undefined)) return
+  localFilters.value.year = year
+  debouncedEmit()
+}
+
+function applyYearNow() {
+  clearTimeout(debounceTimer)
+  emit()
+}
+
 function debouncedEmit() {
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(emit, 300)
@@ -183,6 +215,7 @@ function emit() {
 }
 
 function clearFilters() {
+  yearText.value = ''
   localFilters.value = {
     search: '',
     status: props.initialStatus as ReleaseFilterParams['status'],

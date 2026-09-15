@@ -76,6 +76,31 @@ describe('QuickLogModal', () => {
     expect(wrapper.find('[data-stub="country-select"]').attributes('data-value')).toBe('US')
   })
 
+  it('fills in a release that was already set before the dialog opened', async () => {
+    // An album's page passes its release once and only toggles the dialog. The form used to
+    // wait for the release to change, so it opened with genres and country blank.
+    const wrapper = mount(QuickLogModal, {
+      props: { release: makeRelease({ country: 'GB', genres: ['indie rock'] }), visible: false }
+    })
+    await wrapper.setProps({ visible: true })
+    await flushPromises()
+
+    expect(wrapper.find('[data-stub="country-select"]').attributes('data-value')).toBe('GB')
+    expect(wrapper.find('[data-stub="genre-input"]').attributes('data-value')).toBe('indie rock')
+  })
+
+  it('reopening for the same release starts from what is saved, not from abandoned edits', async () => {
+    const wrapper = mount(QuickLogModal, { props: { release: makeRelease(), visible: true } })
+    await flushPromises()
+    await wrapper.find('textarea').setValue('half-written thoughts')
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toBe('half-written thoughts')
+
+    await wrapper.setProps({ visible: false })
+    await wrapper.setProps({ visible: true })
+    await flushPromises()
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toBe('Some notes')
+  })
+
   it('"Log it" button emits logged event and calls markAsListened', async () => {
     const release = makeRelease()
     const updated = makeRelease({ status: 'LISTENED' })

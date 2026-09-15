@@ -58,7 +58,7 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-166 Rust tests and 188 frontend tests. The Rust integration tests in
+166 Rust tests and 211 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
@@ -338,13 +338,20 @@ theme at runtime, after the app's stylesheet, so a one-class rule such as
 `.my-dialog { background: ... }` loses to `.p-dialog` and never applies, with no error. Set
 the variable the theme reads instead, such as `--p-dialog-background`, on the component's
 root; `.tk-dialog` in `App.vue` does this for dialogs, so give every dialog that class.
-`components/dialogs.guard.test.ts` fails for one that lacks it. The
+`components/dialogs.guard.test.ts` fails for one that lacks it. A suggestion list is appended to
+`<body>`, outside the dialog, so it needs its own class: `.tk-overlay`, passed through
+`pt.overlay`, as `GenreTagInput` does. The
 name of any token's variable comes from `dt()` in `@primeuix/styled`, and the tokens are
 listed in `@primeuix/themes/dist/aura/<component>`.
 
 **A dialog focuses its content's `[autofocus]` element when it finishes opening, or else its
 close button.** Focusing something yourself in `@show` is overridden a moment later. Mark the
 element instead; `AlbumPicker` passes `autofocus` to its list through `pt`.
+
+**Genres are entered through `GenreTagInput` everywhere.** AutoComplete alone makes a chip only
+from a picked suggestion, so the component catches Enter, Tab and comma itself, splits pasted
+lists, and keeps a half-typed genre on blur. The matching rules, including writing a known
+genre the way the library does, are in `utils/genres.ts`.
 
 **`primeicons` is a separate package** and must stay listed in `package.json`.
 

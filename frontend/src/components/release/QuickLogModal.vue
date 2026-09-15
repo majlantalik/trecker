@@ -3,7 +3,7 @@
     v-model:visible="visible"
     header="Log it"
     modal
-    :style="{ width: 'min(440px, calc(100vw - 3rem))' }"
+    :style="{ width: 'min(600px, calc(100vw - 3rem))' }"
     :draggable="false"
     :pt="{ root: { class: 'tk-dialog' } }"
   >
@@ -97,8 +97,14 @@ const form = ref({
   didNotFinish: false
 })
 
-watch(() => props.release, (r) => {
-  if (r) {
+// Filled from the release every time the dialog opens, not only when the release changes.
+// An album's own page hands over the same release each time, so a watch on the release alone
+// never fired there and the dialog opened with its genres and country blank. Reopening for
+// the same release also has to start from what is saved, not from abandoned edits.
+watch(
+  [visible, () => props.release],
+  ([open, r]) => {
+    if (!open || !r) return
     form.value = {
       rating: r.rating ?? null,
       genres: [...r.genres],
@@ -106,8 +112,9 @@ watch(() => props.release, (r) => {
       notes: r.notes || '',
       didNotFinish: r.didNotFinish
     }
-  }
-})
+  },
+  { immediate: true }
+)
 
 async function handleLog(navigateToEntry: boolean) {
   if (!props.release) return

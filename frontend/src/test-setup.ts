@@ -51,7 +51,7 @@ config.global.stubs = {
     emits: ['update:modelValue', 'complete']
   },
   GenreTagInput: {
-    template: '<div data-stub="genre-input"></div>',
+    template: '<div data-stub="genre-input" :data-value="(modelValue || []).join(\'|\')"></div>',
     props: ['modelValue'],
     emits: ['update:modelValue']
   }

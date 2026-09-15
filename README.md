@@ -63,6 +63,10 @@ order albums arrived. Trecker remembers the choice, which is also in **Settings*
 
 **Log it** saves and returns; **Log + Details** saves and opens the Entry page.
 
+Genres are chips, here and everywhere else. Type one and press <kbd>Enter</kbd> or a comma,
+paste a comma-separated list, or pick from the genres already in your library as they are
+suggested. A genre you already have keeps the spelling your library uses.
+
 ### Keyboard shortcuts
 
 Press <kbd>?</kbd> for the list, or click the <kbd>?</kbd> in the sidebar.
@@ -240,7 +244,7 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 188 frontend tests
+npm test           # 211 frontend tests
 npm run test:rust  # 166 Rust tests
 npm run test:net   # 14 tests against the live metadata services
 ```
