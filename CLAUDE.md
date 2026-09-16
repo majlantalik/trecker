@@ -78,6 +78,17 @@ suites with coverage first: Vitest, then the Rust tests under `cargo-llvm-cov`. 
 Clippy itself from `sonar.rust.cargo.manifestPaths`. The repository's Automatic Analysis
 must stay off in SonarQube Cloud, or the two analyses conflict. `backend/` is excluded.
 
+## Workflow
+
+**`main` takes changes only through pull requests.** A GitHub ruleset blocks direct pushes,
+force pushes and deletion, and requires the `Test and analyze` job and the SonarQube Cloud
+quality gate to pass. It has no bypass, so there is no quick fix straight to `main` either.
+
+- Branch from an up-to-date `main`, one change per branch, then `gh pr create`.
+- Merged branches are deleted on GitHub automatically; delete the local one and pull `main`.
+- Zero approvals are required: GitHub never lets an author approve their own pull request,
+  so requiring one would lock `main`.
+
 ## Architecture
 
 ```
