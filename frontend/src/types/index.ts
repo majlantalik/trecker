@@ -69,6 +69,7 @@ export interface UnlinkedRelease {
   artist: string
   title: string
   releaseYear: number | null
+  streamingLinks: Record<string, string>
 }
 
 export interface AlbumCandidate {

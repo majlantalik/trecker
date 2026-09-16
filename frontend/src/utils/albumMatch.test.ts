@@ -18,6 +18,7 @@ function candidate(id: string, over: Partial<AlbumCandidate> = {}): AlbumCandida
 
 const release: UnlinkedRelease = {
   id: 'r1',
+  streamingLinks: {},
   artist: 'Rare Americans',
   title: "You're Not A Bad Person, it's Just A Bad World",
   releaseYear: 2022

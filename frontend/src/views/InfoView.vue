@@ -200,6 +200,8 @@
           <p class="rejected-title">Nothing found on MusicBrainz</p>
           <p v-for="r in match.noMatches" :key="r.id" class="rejected-row">
             <RouterLink :to="`/entry/${r.id}`" class="rejected-name">{{ r.artist }} &mdash; {{ r.title }}</RouterLink>
+            <a v-if="harmonyLookupUrl(r.streamingLinks)" :href="harmonyLookupUrl(r.streamingLinks)!" target="_blank"
+               rel="noopener noreferrer" class="match-open">Add to MusicBrainz <i class="pi pi-external-link" /></a>
           </p>
         </div>
         <div v-if="match.failed.length" class="rejected">
@@ -218,6 +220,7 @@
       :query="match.current ? `${match.current.release.artist} - ${match.current.release.title}` : ''"
       :choosing-id="match.choosingId"
       :remaining="match.toReview.length - 1"
+      :links="match.current?.release.streamingLinks"
       @choose="match.choose"
       @none="match.decline()"
     />
@@ -301,6 +304,7 @@ import { useAlbumMatchStore } from '@/stores/albumMatch'
 import AlbumPicker from '@/components/release/AlbumPicker.vue'
 import { useCaches, describeCovers } from '@/composables/useCaches'
 import { formatBytes } from '@/utils/bytes'
+import { harmonyLookupUrl } from '@/utils/links'
 import type { DbInfo, ImportMode } from '@/types'
 
 const transfer = useLibraryTransfer()
@@ -605,6 +609,10 @@ onMounted(async () => {
   color: var(--tk-accent);
   font-size: 0.8rem;
   white-space: nowrap;
+}
+
+.match-open .pi {
+  font-size: 0.65rem;
 }
 
 .rejected-row a.rejected-name {

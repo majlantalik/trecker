@@ -20,16 +20,19 @@ function candidate(id: string, title: string): AlbumCandidate {
   }
 }
 
-function mountPicker(choosingId: string | null = null) {
+const BOTH = [candidate('album', 'Waking the Fallen'), candidate('comp', 'Waking the Fallen / Sounding the Seventh Trumpet')]
+
+function mountPicker(choosingId: string | null = null, extra: { candidates?: AlbumCandidate[]; links?: Record<string, string> } = {}) {
   return mount(AlbumPicker, {
     props: {
       visible: true,
       query: 'avenged sevenfold waking the fallen',
       choosingId,
-      candidates: [candidate('album', 'Waking the Fallen'), candidate('comp', 'Waking the Fallen / Sounding the Seventh Trumpet')]
+      candidates: BOTH,
+      ...extra
     },
-    // The real Listbox, not a stub: what is under test is its focus and selection wiring.
-    global: { plugins: [[PrimeVue, { unstyled: true }]], stubs: { Listbox: false } }
+    // The real Listbox and Button, not stubs: what is under test is focus, selection and the link.
+    global: { plugins: [[PrimeVue, { unstyled: true }]], stubs: { Listbox: false, Button: false } }
   })
 }
 
@@ -58,5 +61,28 @@ describe('AlbumPicker', () => {
     const wrapper = mountPicker('album')
     await wrapper.findAll('[role="option"]')[1].trigger('click')
     expect(wrapper.emitted('choose')).toBeUndefined()
+  })
+
+  it('offers to add the album to MusicBrainz through Harmony from its streaming links', () => {
+    const wrapper = mountPicker(null, { links: { spotify: 'https://open.spotify.com/album/1' } })
+    const add = wrapper.find('a[href^="https://harmony.pulsewidth.org.uk/release?"]')
+    expect(add.exists()).toBe(true)
+    expect(add.text()).toContain('Add to MusicBrainz')
+    expect(add.attributes('target')).toBe('_blank')
+  })
+
+  it('has no add button for an album without a link Harmony reads', () => {
+    expect(mountPicker().find('a').exists()).toBe(false)
+    expect(mountPicker(null, { links: { youtube: 'https://youtu.be/x' } }).find('a').exists()).toBe(false)
+  })
+
+  it('still offers to add an album when nothing matched', async () => {
+    const wrapper = mountPicker(null, { candidates: [], links: { tidal: 'https://tidal.com/browse/album/2' } })
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('MusicBrainz has no album like this')
+    expect(wrapper.find('a').exists()).toBe(true)
+    const close = wrapper.findAll('button').find((b) => b.text() === 'Close')
+    await close!.trigger('click')
+    expect(wrapper.emitted('none')).toHaveLength(1)
   })
 })

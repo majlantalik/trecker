@@ -669,6 +669,7 @@ async fn unlinked_lists_tracked_albums_without_an_id_in_the_order_added() {
     let first = releases::create(&pool, req("Hexis", "Aeternum")).await.unwrap();
     let mut second = req("Gaupa", "Myriad");
     second.release_year = Some(2022);
+    second.streaming_links = Some(HashMap::from([("spotify".into(), "https://open.spotify.com/album/1".into())]));
     let second = releases::create(&pool, second).await.unwrap();
     let deleted = releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
     releases::delete(&pool, &deleted.id).await.unwrap();
@@ -677,6 +678,8 @@ async fn unlinked_lists_tracked_albums_without_an_id_in_the_order_added() {
     let ids: Vec<_> = list.iter().map(|r| r.id.as_str()).collect();
     assert_eq!(ids, [first.id.as_str(), second.id.as_str()], "no linked, no untracked");
     assert_eq!(list[1].release_year, Some(2022));
+    assert!(list[0].streaming_links.is_empty());
+    assert_eq!(list[1].streaming_links["spotify"], "https://open.spotify.com/album/1");
 
     releases::link_release_group(&pool, &first.id, "group-2").await.unwrap();
     assert_eq!(releases::unlinked(&pool).await.unwrap().len(), 1);

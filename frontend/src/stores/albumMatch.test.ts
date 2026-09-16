@@ -12,7 +12,7 @@ vi.mock('@/stores/genres', () => ({ useGenresStore: () => ({ fetchGenres }) }))
 const { useAlbumMatchStore, CONSECUTIVE_FAILURES_TO_STOP } = await import('./albumMatch')
 
 function album(id: string, artist: string, title: string, releaseYear: number | null = 2022): UnlinkedRelease {
-  return { id, artist, title, releaseYear }
+  return { id, artist, title, releaseYear, streamingLinks: {} }
 }
 
 function candidate(id: string, artist: string, title: string, releaseYear: number | null = 2022): AlbumCandidate {

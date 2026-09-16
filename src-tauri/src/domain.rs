@@ -36,7 +36,7 @@ pub struct Release {
     pub genres: Vec<String>,
 }
 
-/// A tracked album with no MusicBrainz id, as much of it as a search for it needs.
+/// A tracked album with no MusicBrainz id: what a search for it needs, and its links.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnlinkedRelease {
@@ -44,6 +44,8 @@ pub struct UnlinkedRelease {
     pub artist: String,
     pub title: String,
     pub release_year: Option<i32>,
+    /// For adding the album to MusicBrainz when it is missing there.
+    pub streaming_links: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
