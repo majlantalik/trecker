@@ -15,7 +15,12 @@
     <!-- `autofocus` on the list, because once its opening animation ends the dialog focuses
          whatever carries it, or else its close button. Focused, the arrow keys work at once,
          which matters in the palette where the whole flow is driven from the keyboard. -->
+    <p v-if="!candidates.length" class="ap-empty">
+      MusicBrainz has no album like this.
+      <template v-if="addUrl">If it is missing there, you can add it from its streaming link.</template>
+    </p>
     <Listbox
+      v-else
       :model-value="null"
       :options="candidates"
       option-label="title"
@@ -55,24 +60,42 @@
         <span class="ap-sep">·</span>
         <kbd>Esc</kbd> to close
       </span>
-      <Button label="None of these" text size="small" :disabled="!!choosingId" @click="emit('none')" />
+      <span class="ap-actions">
+        <!-- A plain anchor, which the opener plugin hands to the browser. Harmony reads the
+             album from its streaming links and fills in MusicBrainz's "Add release" form. -->
+        <Button
+          v-if="addUrl"
+          as="a"
+          :href="addUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          label="Add to MusicBrainz"
+          icon="pi pi-external-link"
+          icon-pos="right"
+          text
+          size="small"
+        />
+        <Button :label="candidates.length ? 'None of these' : 'Close'" text size="small" :disabled="!!choosingId" @click="emit('none')" />
+      </span>
     </div>
   </Dialog>
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Listbox from 'primevue/listbox'
 import Button from 'primevue/button'
 import { coverSrc } from '@/api/cache'
 import { describeCandidate } from '@/utils/candidates'
+import { harmonyLookupUrl } from '@/utils/links'
 import type { AlbumCandidate } from '@/types'
 
 /**
  * A list of albums from a MusicBrainz search to choose from. Quick add shows it when a
  * search matches more than one; refreshing an album with no id shows it for any match.
- * Choosing one hands it back and the parent decides what happens next.
+ * Choosing one hands it back and the parent decides what happens next. When the album being
+ * linked has streaming links, it also offers to add the album to MusicBrainz through Harmony.
  */
 const props = defineProps<{
   candidates: AlbumCandidate[]
@@ -81,9 +104,13 @@ const props = defineProps<{
   choosingId: string | null
   /** Albums still waiting after this one, when the picker is walking through several. */
   remaining?: number
+  /** The streaming links of the album being linked, for adding it to MusicBrainz. */
+  links?: Record<string, string> | null
 }>()
 
 const emit = defineEmits<{ choose: [candidate: AlbumCandidate]; none: [] }>()
+
+const addUrl = computed(() => harmonyLookupUrl(props.links))
 
 const visible = defineModel<boolean>('visible', { default: false })
 
@@ -169,6 +196,13 @@ function onChange(event: { value: AlbumCandidate | null }) {
   color: rgba(226, 228, 240, 0.6);
 }
 
+.ap-empty {
+  margin: 0;
+  padding: 1rem 0;
+  font-size: 0.88rem;
+  color: var(--tk-text);
+}
+
 .ap-busy {
   color: var(--tk-accent);
   flex-shrink: 0;
@@ -180,6 +214,13 @@ function onChange(event: { value: AlbumCandidate | null }) {
   justify-content: space-between;
   gap: 1rem;
   margin-top: 0.85rem;
+}
+
+.ap-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 .ap-hint {
@@ -198,6 +239,6 @@ function onChange(event: { value: AlbumCandidate | null }) {
 <style>
 /* Unscoped: PrimeVue teleports the dialog outside this component. */
 .ap-root {
-  width: min(560px, calc(100vw - 3rem));
+  width: min(720px, calc(100vw - 3rem));
 }
 </style>

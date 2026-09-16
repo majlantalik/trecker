@@ -218,6 +218,7 @@
       :query="match.current ? `${match.current.release.artist} - ${match.current.release.title}` : ''"
       :choosing-id="match.choosingId"
       :remaining="match.toReview.length - 1"
+      :links="match.current?.release.streamingLinks"
       @choose="match.choose"
       @none="match.decline()"
     />

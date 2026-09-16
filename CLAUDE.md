@@ -58,7 +58,7 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-177 Rust tests and 248 frontend tests. The Rust integration tests in
+177 Rust tests and 253 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
@@ -186,6 +186,11 @@ The rules that follow:
   must equal exactly one candidate after `normalizeForMatch` in `utils/albumMatch.ts`.
   Everything else waits for a person in the same `AlbumPicker`. Do not loosen this to the
   top-ranked hit. "None of these" is not stored; the next run asks again.
+- **An album missing from MusicBrainz is added there by a person, through Harmony.** When the
+  album being linked has a Spotify, Tidal, Deezer, Apple Music, Bandcamp or Beatport link,
+  `AlbumPicker` shows "Add to MusicBrainz", which opens Harmony's lookup of those links from
+  `harmonyLookupUrl` in `utils/links.ts`. The album page opens the picker for it even when the
+  search found nothing. Trecker never submits anything to MusicBrainz itself.
 - **"Release group" never reaches the interface.** The UI says album and the export field
   stays `musicbrainzId`. Code, schema and developer docs use the precise term.
 

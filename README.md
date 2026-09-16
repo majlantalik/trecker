@@ -90,6 +90,12 @@ choice. **Info → Match to MusicBrainz** does this for every such album at once
 matches on artist, title and year are linked on their own, and the rest wait for you to
 pick, one after another.
 
+When MusicBrainz does not have the album at all, and it has a Spotify, Tidal, Deezer, Apple
+Music, Bandcamp or Beatport link, the list offers **Add to MusicBrainz**. It opens
+[Harmony](https://harmony.pulsewidth.org.uk) on those links, which fills in MusicBrainz's
+"Add release" form for you to check and submit with your MusicBrainz account. Refresh the
+album a few minutes later to link it.
+
 ### Library
 
 Everything you have listened to, as a table or a grid. Filter by free-text search, status,
@@ -252,7 +258,7 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 248 frontend tests
+npm test           # 253 frontend tests
 npm run test:rust  # 177 Rust tests
 npm run test:net   # 14 tests against the live metadata services
 ```

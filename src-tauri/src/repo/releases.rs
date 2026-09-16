@@ -438,9 +438,28 @@ pub async fn unlinked(pool: &SqlitePool) -> AppResult<Vec<UnlinkedRelease>> {
     .await
     .map_err(map_err)?;
 
+    let mut links: HashMap<String, HashMap<String, String>> = HashMap::new();
+    let link_rows: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT l.release_id, l.service, l.url FROM release_streaming_links l \
+         JOIN releases r ON r.id = l.release_id \
+         WHERE r.musicbrainz_release_group_id IS NULL",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(map_err)?;
+    for (release_id, service, url) in link_rows {
+        links.entry(release_id).or_default().insert(service, url);
+    }
+
     Ok(rows
         .into_iter()
-        .map(|(id, artist, title, release_year)| UnlinkedRelease { id, artist, title, release_year })
+        .map(|(id, artist, title, release_year)| UnlinkedRelease {
+            streaming_links: links.remove(&id).unwrap_or_default(),
+            id,
+            artist,
+            title,
+            release_year,
+        })
         .collect())
 }
 

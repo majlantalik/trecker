@@ -226,6 +226,7 @@
       :candidates="albumLink.candidates.value"
       :query="albumLink.query.value"
       :choosing-id="albumLink.choosingId.value"
+      :links="release.streamingLinks"
       @choose="linkAlbum"
       @none="albumLink.pickerVisible.value = false"
     />
@@ -267,7 +268,7 @@ import { releasesApi } from '@/api/releases'
 import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
 import type { AlbumCandidate, Release } from '@/types'
-import { streamingService } from '@/utils/links'
+import { harmonyLookupUrl, streamingService } from '@/utils/links'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
@@ -347,7 +348,10 @@ async function refreshMetadata() {
 
 async function chooseAlbum(current: Release) {
   const outcome = await albumLink.search(current)
-  if (outcome === 'none') {
+  if (outcome === 'none' && harmonyLookupUrl(current.streamingLinks)) {
+    // Nothing to choose, but the list still offers to add the album to MusicBrainz.
+    albumLink.pickerVisible.value = true
+  } else if (outcome === 'none') {
     toast.add({
       severity: 'info',
       summary: 'No matches',
