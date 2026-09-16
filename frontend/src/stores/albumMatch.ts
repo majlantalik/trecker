@@ -21,6 +21,10 @@ export interface MatchProblem {
 /** A run stops rather than failing every remaining album when MusicBrainz is unreachable. */
 export const CONSECUTIVE_FAILURES_TO_STOP = 3
 
+function reasonOf(e: any): string {
+  return e?.message ?? String(e)
+}
+
 /**
  * Linking every album without a MusicBrainz id, in two passes.
  *
@@ -72,10 +76,6 @@ export const useAlbumMatchStore = defineStore('albumMatch', () => {
     noMatches.value = []
     duplicates.value = []
     failed.value = []
-  }
-
-  function reasonOf(e: any): string {
-    return e?.message ?? String(e)
   }
 
   async function link(release: UnlinkedRelease, candidate: AlbumCandidate) {

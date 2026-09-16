@@ -166,10 +166,8 @@
                     severity="secondary" :disabled="match.stopping" @click="match.stop()" />
           </span>
         </div>
-        <div v-if="match.running" class="match-progress" role="progressbar" aria-label="Matching albums"
-             :aria-valuemin="0" :aria-valuemax="match.total" :aria-valuenow="match.processed">
-          <div class="match-progress-fill" :style="{ width: `${progressPercent}%` }" />
-        </div>
+        <progress v-if="match.running" class="match-progress" aria-label="Matching albums"
+                  :max="match.total || 1" :value="match.processed" />
         <p class="form-hint">
           An album whose artist, title and year match exactly one album on MusicBrainz is linked
           straight away; the rest wait for you to choose. Linking replaces the artist, title,
@@ -314,7 +312,6 @@ const reviewVisible = computed({
   get: () => reviewing.value && match.current !== null,
   set: (open: boolean) => { reviewing.value = open }
 })
-const progressPercent = computed(() => (match.total ? Math.round((match.processed / match.total) * 100) : 0))
 const matchSummary = computed(() => {
   const parts = [`${match.linked} linked`]
   if (match.toReview.length) parts.push(`${match.toReview.length} to review`)
@@ -578,17 +575,30 @@ onMounted(async () => {
   text-align: right;
 }
 
+/* A native <progress>, restyled: the track through the element and its WebKit bar, the fill
+   through the value pseudo-elements, which WebKitGTK and Firefox name differently. */
 .match-progress {
+  appearance: none;
+  display: block;
+  width: 100%;
   height: 6px;
+  border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.match-progress-fill {
-  height: 100%;
+.match-progress::-webkit-progress-bar {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.match-progress::-webkit-progress-value {
   background: var(--tk-accent);
   transition: width 0.3s ease;
+}
+
+.match-progress::-moz-progress-bar {
+  background: var(--tk-accent);
 }
 
 .match-open {

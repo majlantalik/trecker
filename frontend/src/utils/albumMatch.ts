@@ -8,13 +8,13 @@ import type { AlbumCandidate, UnlinkedRelease } from '@/types'
 export function normalizeForMatch(text: string | null | undefined): string {
   return (text ?? '')
     .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
-    .replace(/[‘’‚‛′`´]/g, "'")
-    .replace(/[“”„‟″]/g, '"')
-    .replace(/[‐‑‒–—―]/g, '-')
-    .replace(/…/g, '...')
+    .replaceAll(/\p{M}/gu, '')
+    .replaceAll(/[‘’‚‛′`´]/g, "'")
+    .replaceAll(/[“”„‟″]/g, '"')
+    .replaceAll(/[‐‑‒–—―]/g, '-')
+    .replaceAll(/…/g, '...')
     .toLowerCase()
-    .replace(/\s+/g, ' ')
+    .replaceAll(/\s+/g, ' ')
     .trim()
 }
 
