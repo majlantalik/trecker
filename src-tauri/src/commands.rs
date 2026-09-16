@@ -4,7 +4,12 @@
 //! `frontend/src/api/commands.test.ts` asserts every name and argument key.
 
 use crate::db::{Db, DbInfo};
-use crate::domain::*;
+use crate::domain::{
+    ActivityDataPoint, AlbumCandidate, Artist, ArtistAddRequest, ArtistCandidate,
+    ArtistUpdateRequest, BreakdownItem, DiscographyEntry, PageResponse, Release,
+    ReleaseFilterParams, ReleaseRequest, ReleaseUpdateRequest, ResolveRequest, ResolvedMetadata,
+    YearEndEntry,
+};
 use crate::error::{AppError, AppResult};
 use crate::library;
 use crate::repo;
@@ -237,7 +242,8 @@ pub async fn library_export(
     let releases = collect_export(&db.pool).await?;
     let text = library::render(&releases, format, &version, &repo::now())?;
 
-    std::fs::write(&path, text.as_bytes())
+    tokio::fs::write(&path, text.as_bytes())
+        .await
         .map_err(|e| AppError::Internal(format!("could not write {path}: {e}")))?;
 
     Ok(ExportSummary {
@@ -282,7 +288,7 @@ pub async fn library_import(
     path: String,
     mode: Option<library::ImportMode>,
 ) -> AppResult<library::ImportReport> {
-    let text = std::fs::read_to_string(&path).map_err(|e| {
+    let text = tokio::fs::read_to_string(&path).await.map_err(|e| {
         AppError::Invalid(match e.kind() {
             std::io::ErrorKind::InvalidData => format!("{path} is not a UTF-8 text file"),
             _ => format!("could not read {path}: {e}"),

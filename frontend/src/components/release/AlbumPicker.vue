@@ -129,7 +129,7 @@ function onChange(event: { value: AlbumCandidate | null }) {
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.06);
-  color: rgba(226, 228, 240, 0.3);
+  color: rgba(226, 228, 240, 0.55);
 }
 
 .ap-text {

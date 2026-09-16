@@ -43,7 +43,8 @@
             <span class="verdict-prompt">
               {{ artist.status === 'CHECKED' ? `Checked ${formatDate(artist.checkedAt)}` : 'Checked them out?' }}
             </span>
-            <div class="verdict-buttons" role="group" aria-label="Your verdict">
+            <fieldset class="verdict-buttons">
+              <legend class="visually-hidden">Your verdict</legend>
               <button
                 v-for="choice in CHOICES"
                 :key="choice.key"
@@ -56,7 +57,7 @@
               >
                 <i :class="choice.icon" /> {{ choice.label }}
               </button>
-            </div>
+            </fieldset>
             <Button
               v-if="artist.status === 'CHECKED'"
               label="Back to the list"
@@ -82,6 +83,7 @@
           v-model="noteDraft"
           rows="2"
           auto-resize
+          aria-label="Note"
           placeholder="Who recommended them, where you heard them, where to start..."
           class="note-textarea"
           fluid
@@ -469,6 +471,20 @@ function formatDate(iso: string | null) {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .verdict-btn {
@@ -629,7 +645,7 @@ function formatDate(iso: string | null) {
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.05);
-  color: rgba(226, 228, 240, 0.3);
+  color: rgba(226, 228, 240, 0.55);
 }
 
 .album-text {

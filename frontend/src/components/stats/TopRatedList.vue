@@ -4,7 +4,7 @@
     <div v-if="releases.length" class="top-list">
       <div v-for="(r, i) in releases" :key="r.id" class="top-item">
         <span class="rank">{{ i + 1 }}</span>
-        <img v-if="r.albumArtUrl" :src="coverSrc(r.albumArtUrl)" class="item-art" />
+        <img v-if="r.albumArtUrl" :src="coverSrc(r.albumArtUrl)" class="item-art" alt="" />
         <div class="item-info">
           <RouterLink :to="`/entry/${r.id}`" class="item-title">{{ r.artist }} – {{ r.title }}</RouterLink>
           <div class="item-meta">

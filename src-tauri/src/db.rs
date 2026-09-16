@@ -38,7 +38,8 @@ pub struct DbInfo {
 }
 
 pub async fn connect(dir: &Path) -> AppResult<Db> {
-    std::fs::create_dir_all(dir)
+    tokio::fs::create_dir_all(dir)
+        .await
         .map_err(|e| AppError::Internal(format!("cannot create {}: {e}", dir.display())))?;
 
     let path = dir.join("trecker.db");
@@ -110,7 +111,10 @@ impl Db {
             .await
             .map_err(internal)?;
 
-        let size_bytes = std::fs::metadata(&self.path).map(|m| m.len() as i64).unwrap_or(0);
+        let size_bytes = tokio::fs::metadata(&self.path)
+            .await
+            .map(|m| m.len() as i64)
+            .unwrap_or(0);
 
         Ok(DbInfo {
             path: self.path.display().to_string(),

@@ -168,7 +168,7 @@
         <div class="transfer-row transfer-import">
           <span class="stat-label">Import a file</span>
           <span class="transfer-buttons">
-            <Select v-model="mode" :options="MODES" option-label="label" option-value="value"
+            <Select v-model="mode" :options="MODES" aria-label="Import mode" option-label="label" option-value="value"
                     size="small" class="transfer-mode" />
             <Button label="Choose file" icon="pi pi-upload" size="small" outlined
                     :disabled="transfer.busy.value" @click="transfer.importLibrary(mode)" />

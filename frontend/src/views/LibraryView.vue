@@ -40,7 +40,7 @@
         >
           <Column field="albumArtUrl" header="" style="width: 60px">
             <template #body="{ data }">
-              <img v-if="data.albumArtUrl" :src="coverSrc(data.albumArtUrl)" class="table-art" />
+              <img v-if="data.albumArtUrl" :src="coverSrc(data.albumArtUrl)" class="table-art" alt="" />
               <div v-else class="table-art-placeholder"><i class="pi pi-music" /></div>
             </template>
           </Column>
@@ -64,7 +64,7 @@
           </Column>
           <Column style="width: 80px">
             <template #body="{ data }">
-              <div class="table-actions" @click.stop>
+              <div class="table-actions">
                 <Button
                   icon="pi pi-pencil"
                   text

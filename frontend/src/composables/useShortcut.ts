@@ -18,7 +18,7 @@ export function useShortcut(
   const wantsCtrl = parts.includes('ctrl')
   const wantsShift = parts.includes('shift')
   const wantsAlt = parts.includes('alt')
-  const key = parts[parts.length - 1]
+  const key = parts.at(-1)
 
   function onKeydown(event: KeyboardEvent) {
     if (!options.whileTyping && isTyping(event.target)) return

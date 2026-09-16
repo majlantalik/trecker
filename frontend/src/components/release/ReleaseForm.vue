@@ -10,36 +10,36 @@
     <form @submit.prevent="handleSubmit" class="release-form">
       <div class="form-row">
         <div class="form-field" style="flex: 2">
-          <label class="tk-label">Artist *</label>
+          <label class="tk-label" for="release-artist">Artist *</label>
           <!-- autofocus: otherwise the dialog focuses its close button when it opens. -->
-          <InputText v-model="form.artist" placeholder="Artist name" fluid required autofocus />
+          <InputText id="release-artist" v-model="form.artist" placeholder="Artist name" fluid required autofocus />
         </div>
         <div class="form-field" style="flex: 3">
-          <label class="tk-label">Title *</label>
-          <InputText v-model="form.title" placeholder="Album / EP title" fluid required />
+          <label class="tk-label" for="release-title">Title *</label>
+          <InputText id="release-title" v-model="form.title" placeholder="Album / EP title" fluid required />
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-field">
-          <label class="tk-label">Year</label>
-          <InputNumber v-model="form.releaseYear" placeholder="2024" :min="1900" :max="2099" :useGrouping="false" fluid />
+          <label class="tk-label" for="release-year">Year</label>
+          <InputNumber v-model="form.releaseYear" input-id="release-year" placeholder="2024" :min="1900" :max="2099" :useGrouping="false" fluid />
         </div>
       </div>
 
       <div class="form-field">
-        <label class="tk-label">Genres</label>
-        <GenreTagInput v-model="form.genres" />
+        <label class="tk-label" for="release-genres">Genres</label>
+        <GenreTagInput v-model="form.genres" input-id="release-genres" />
       </div>
 
       <div class="form-row">
         <div class="form-field" style="flex: 1">
-          <label class="tk-label">Discovery Link</label>
-          <InputText v-model="form.discoveryLink" placeholder="YouTube, Discord..." fluid />
+          <label class="tk-label" for="release-discovery-link">Discovery Link</label>
+          <InputText id="release-discovery-link" v-model="form.discoveryLink" placeholder="YouTube, Discord..." fluid />
         </div>
         <div class="form-field" style="flex: 1">
-          <label class="tk-label">Streaming Link</label>
-          <InputText v-model="form.streamingLinkInput" placeholder="Spotify, Tidal..." fluid />
+          <label class="tk-label" for="release-streaming-link">Streaming Link</label>
+          <InputText id="release-streaming-link" v-model="form.streamingLinkInput" placeholder="Spotify, Tidal..." fluid />
         </div>
       </div>
 
@@ -64,6 +64,7 @@ import InputNumber from 'primevue/inputnumber'
 import Button from 'primevue/button'
 import GenreTagInput from './GenreTagInput.vue'
 import type { Release, ResolvedMetadata } from '@/types'
+import { streamingService } from '@/utils/links'
 
 const props = defineProps<{
   prefill?: ResolvedMetadata | null
@@ -136,11 +137,7 @@ function buildStreamingLinks(): Record<string, string> | undefined {
   const result: Record<string, string> = { ...form.value.streamingLinks }
   const input = form.value.streamingLinkInput.trim()
   if (input && !Object.values(result).includes(input)) {
-    const service = input.includes('spotify.com') ? 'spotify'
-      : input.includes('tidal.com') ? 'tidal'
-      : input.includes('youtube.com') || input.includes('youtu.be') ? 'youtube'
-      : 'other'
-    result[service] = input
+    result[streamingService(input)] = input
   }
   return Object.keys(result).length > 0 ? result : undefined
 }

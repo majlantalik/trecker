@@ -2,7 +2,10 @@
 
 use super::{map_err, new_id, now, push_id_list};
 use crate::db::LOCAL_USER_ID;
-use crate::domain::*;
+use crate::domain::{
+    Artist, ArtistLink, ArtistMetadata, ArtistStatus, ArtistUpdateRequest, ArtistVerdict,
+    LibraryMatch, ReleaseStatus,
+};
 use crate::error::{AppError, AppResult};
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use std::collections::HashMap;

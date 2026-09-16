@@ -4,7 +4,7 @@ import { releasesApi } from '@/api/releases'
 import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
 import { prefillFromCandidate } from '@/utils/candidates'
-import { visibleDiscography } from '@/utils/artists'
+import { mainDiscography } from '@/utils/artists'
 import type { DiscographyEntry, Release, ReleaseRequest, ResolvedMetadata } from '@/types'
 
 /**
@@ -26,8 +26,8 @@ export function useDiscography(artistId: () => string, artistName: () => string)
   /** The album being looked up or added, so its row can show it. */
   const busyId = ref<string | null>(null)
 
-  const visible = computed(() => visibleDiscography(entries.value, showAll.value))
-  const hiddenCount = computed(() => entries.value.length - visibleDiscography(entries.value, false).length)
+  const visible = computed(() => (showAll.value ? entries.value : mainDiscography(entries.value)))
+  const hiddenCount = computed(() => entries.value.length - mainDiscography(entries.value).length)
   const listenedCount = computed(() => entries.value.filter((e) => e.library?.status === 'LISTENED').length)
 
   // Queueing: the add form's state.

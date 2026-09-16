@@ -7,7 +7,7 @@
 
 use super::{hydrate, map_err, RELEASE_COLUMNS};
 use crate::db::LOCAL_USER_ID;
-use crate::domain::*;
+use crate::domain::{ActivityDataPoint, BreakdownItem, Release, YearEndEntry};
 use crate::error::AppResult;
 use sqlx::{Row, SqlitePool};
 

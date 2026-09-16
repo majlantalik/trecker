@@ -37,7 +37,7 @@ async fn add_listened(
 ) -> String {
     let mut r = req(artist, title);
     r.country = country.map(String::from);
-    r.genres = Some(genres.iter().map(|s| s.to_string()).collect());
+    r.genres = Some(genres.iter().map(ToString::to_string).collect());
     let created = releases::create(pool, r).await.unwrap();
 
     releases::update(

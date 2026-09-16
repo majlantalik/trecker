@@ -8,11 +8,11 @@
     <div class="filters-body">
       <div class="filter-group">
         <div class="filter-item">
-          <label class="filter-label">
+          <label class="filter-label" for="filter-search">
             <i class="pi pi-search" />
             Search
           </label>
-          <InputText v-model="localFilters.search" placeholder="Artist or title..." fluid @input="debouncedEmit" />
+          <InputText id="filter-search" v-model="localFilters.search" placeholder="Artist or title..." fluid @input="debouncedEmit" />
         </div>
       </div>
 
@@ -20,12 +20,15 @@
 
       <div class="filter-group">
         <div class="filter-item">
-          <label class="filter-label">
+          <!-- A span, not a label: Select's focusable element is not a form control, so a
+               label's "for" cannot name it and aria-labelledby does instead. -->
+          <span id="filter-status-label" class="filter-label">
             <i class="pi pi-tag" />
             Status
-          </label>
+          </span>
           <Select
             v-model="localFilters.status"
+            aria-labelledby="filter-status-label"
             :options="statuses"
             option-label="label"
             option-value="value"
@@ -37,12 +40,13 @@
         </div>
 
         <div class="filter-item">
-          <label class="filter-label">
+          <label class="filter-label" for="filter-genre">
             <i class="pi pi-microphone" />
             Genre
           </label>
           <AutoComplete
             v-model="localFilters.genre"
+            input-id="filter-genre"
             :suggestions="filteredGenres"
             @complete="searchGenre"
             placeholder="Filter by genre..."
@@ -53,12 +57,13 @@
         </div>
 
         <div class="filter-item">
-          <label class="filter-label">
+          <span id="filter-country-label" class="filter-label">
             <i class="pi pi-globe" />
             Country
-          </label>
+          </span>
           <Select
             v-model="localFilters.country"
+            aria-labelledby="filter-country-label"
             :options="countryOptions"
             option-label="label"
             option-value="value"
@@ -80,13 +85,14 @@
         </div>
 
         <div class="filter-item">
-          <label class="filter-label">
+          <label class="filter-label" for="filter-year">
             <i class="pi pi-calendar" />
             Year
           </label>
           <!-- A text field, not InputNumber: that one formats 2025 as "2,025" and updates its
                value only on blur, so a filter reading it while typing was always one edit behind. -->
           <InputText
+            id="filter-year"
             :model-value="yearText"
             placeholder="2024"
             inputmode="numeric"
@@ -103,11 +109,12 @@
 
       <div class="filter-group">
         <div class="filter-item">
-          <label class="filter-label">
+          <span id="filter-rating-label" class="filter-label">
             <i class="pi pi-star" />
             Min Rating
-          </label>
+          </span>
           <HalfStarRating
+            aria-labelledby="filter-rating-label"
             :modelValue="localFilters.ratingMin ?? null"
             :cancel="true"
             @update:modelValue="v => { localFilters.ratingMin = v ?? undefined; emit() }"
@@ -116,8 +123,8 @@
         </div>
 
         <div class="filter-item">
-          <label class="filter-label inline-label">
-            <Checkbox v-model="localFilters.didNotFinish" binary @change="emit" />
+          <label class="filter-label inline-label" for="filter-dnf">
+            <Checkbox v-model="localFilters.didNotFinish" binary input-id="filter-dnf" @change="emit" />
             DNF only
           </label>
         </div>

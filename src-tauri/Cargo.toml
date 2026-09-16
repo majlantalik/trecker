@@ -24,7 +24,8 @@ tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-tokio = { version = "1", features = ["rt-multi-thread", "time", "sync"] }
+# `fs` so async commands never block a runtime thread on disk I/O.
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "fs"] }
 # rustls rather than native-tls: no OpenSSL to find at build time and none to ship,
 # which matters for a binary that has to build on three platforms.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }

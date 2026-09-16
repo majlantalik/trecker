@@ -34,7 +34,7 @@
         <i class="pi pi-check-circle" /> Nobody left to check.
       </p>
       <TransitionGroup name="list" tag="div" class="artist-list">
-        <ArtistCard v-for="artist in store.toCheck" :key="artist.id" :artist="artist" @click="open" />
+        <ArtistCard v-for="artist in store.toCheck" :key="artist.id" :artist="artist" />
       </TransitionGroup>
 
       <section v-if="store.checked.length" class="checked-section">
@@ -48,7 +48,7 @@
           Checked <span class="count">({{ store.checked.length }})</span>
         </button>
         <div v-if="showChecked" class="artist-list">
-          <ArtistCard v-for="artist in store.checked" :key="artist.id" :artist="artist" @click="open" />
+          <ArtistCard v-for="artist in store.checked" :key="artist.id" :artist="artist" />
         </div>
       </section>
     </template>
@@ -66,7 +66,6 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -75,9 +74,8 @@ import ArtistCard from '@/components/artist/ArtistCard.vue'
 import ArtistPicker from '@/components/artist/ArtistPicker.vue'
 import { useArtistSearch } from '@/composables/useArtistSearch'
 import { useArtistsStore } from '@/stores/artists'
-import type { Artist, ArtistCandidate } from '@/types'
+import type { ArtistCandidate } from '@/types'
 
-const router = useRouter()
 const toast = useToast()
 const store = useArtistsStore()
 const { query, searching, candidates, pickerVisible, addingId, error, search, choose } = useArtistSearch()
@@ -110,9 +108,6 @@ async function add(candidate: ArtistCandidate) {
   })
 }
 
-function open(artist: Artist) {
-  router.push({ name: 'artist', params: { id: artist.id } })
-}
 </script>
 
 <style scoped>

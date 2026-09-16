@@ -7,7 +7,7 @@ import {
   labelledLinks,
   linkLabel,
   verdictLabel,
-  visibleDiscography
+  mainDiscography
 } from './artists'
 import type { DiscographyEntry } from '@/types'
 
@@ -66,7 +66,7 @@ describe('verdicts', () => {
   })
 })
 
-describe('visibleDiscography', () => {
+describe('mainDiscography', () => {
   const entry = (id: string, secondaryTypes: string[], tracked = false): DiscographyEntry => ({
     musicbrainzReleaseGroupId: id,
     artist: null,
@@ -81,8 +81,7 @@ describe('visibleDiscography', () => {
 
   it('hides live albums and compilations until asked, except ones you track', () => {
     const all = [entry('studio', []), entry('live', ['Live']), entry('best of', ['Compilation'], true)]
-    expect(visibleDiscography(all, false).map((e) => e.title)).toEqual(['studio', 'best of'])
-    expect(visibleDiscography(all, true)).toHaveLength(3)
+    expect(mainDiscography(all).map((e) => e.title)).toEqual(['studio', 'best of'])
   })
 })
 

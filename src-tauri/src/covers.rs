@@ -488,7 +488,7 @@ mod tests {
             }
             let marker = bytes[i + 1];
             let len = u16::from_be_bytes([bytes[i + 2], bytes[i + 3]]) as usize;
-            if matches!(marker, 0xC0 | 0xC1 | 0xC2) {
+            if matches!(marker, 0xC0..=0xC2) {
                 return Some(u16::from_be_bytes([bytes[i + 7], bytes[i + 8]]));
             }
             i += 2 + len;

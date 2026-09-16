@@ -298,7 +298,7 @@ async function handleFormSubmit(data: any) {
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
-  color: rgba(226, 228, 240, 0.3);
+  color: rgba(226, 228, 240, 0.55);
 }
 
 .suggestion-label {

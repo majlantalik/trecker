@@ -1,7 +1,8 @@
 <template>
   <!-- Capture phase, so a typed genre is turned into a chip before AutoComplete sees the key.
        AutoComplete alone only makes a chip from a picked suggestion; Enter on typed text did
-       nothing, and a comma was just a character. -->
+       nothing, and a comma was just a character.
+       The aria-label names the input only when no visible label points at inputId. -->
   <div class="genre-input" @keydown.capture="onKeydown" @focusout="onFocusOut">
     <AutoComplete
       ref="ac"
@@ -13,9 +14,10 @@
       :show-empty-message="false"
       :delay="120"
       :placeholder="modelValue.length ? '' : placeholder"
+      :input-id="inputId"
       :pt="{
         overlay: { class: 'tk-overlay' },
-        input: { onPaste, 'aria-label': 'Add a genre' }
+        input: { onPaste, 'aria-label': inputId ? undefined : 'Add a genre' }
       }"
       @complete="search"
       @update:model-value="onPicked"
@@ -48,9 +50,15 @@ import { addGenres, splitGenres, suggestGenres } from '@/utils/genres'
  * Genres as chips. Type a genre and press Enter, Tab or a comma; paste a comma-separated
  * list; or pick from the genres already in your library, which are suggested as you type.
  */
-const props = withDefaults(defineProps<{ modelValue: string[]; placeholder?: string }>(), {
-  placeholder: 'Add genres...'
-})
+const props = withDefaults(
+  defineProps<{
+    modelValue: string[]
+    placeholder?: string
+    /** The input's id, for a `<label for>` outside the component. */
+    inputId?: string
+  }>(),
+  { placeholder: 'Add genres...', inputId: undefined }
+)
 
 const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>()
 
@@ -89,12 +97,12 @@ function onKeydown(event: KeyboardEvent) {
   // A suggestion highlighted with the arrow keys is AutoComplete's to pick.
   const highlighted = !!input()?.getAttribute('aria-activedescendant')
 
-  if (event.key === ',' || event.key === ';') {
-    event.preventDefault()
-    event.stopPropagation()
-    commitTyped()
-  } else if ((event.key === 'Enter' || event.key === 'NumpadEnter') && !highlighted) {
-    // Always swallowed: inside a form, Enter on this field must not submit it.
+  const separator = event.key === ',' || event.key === ';'
+  const enter = (event.key === 'Enter' || event.key === 'NumpadEnter') && !highlighted
+
+  if (separator || enter) {
+    // Always swallowed: a separator is not part of a genre, and inside a form, Enter on this
+    // field must not submit it.
     event.preventDefault()
     event.stopPropagation()
     commitTyped()

@@ -22,7 +22,7 @@ export const useGenresStore = defineStore('genres', () => {
 
   function addGenre(name: string) {
     if (!genres.value.includes(name)) {
-      genres.value = [...genres.value, name].sort()
+      genres.value = [...genres.value, name].sort((a, b) => a.localeCompare(b))
     }
   }
 

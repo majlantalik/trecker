@@ -1,5 +1,7 @@
 <template>
-  <div class="release-card" @click="$emit('click', release)">
+  <!-- Focusable and opened with Enter, so the queue and library grid work from the keyboard.
+       No button role: the card holds its own action buttons, which a button cannot contain. -->
+  <div class="release-card" tabindex="0" @click="open" @keydown.enter.self="open">
     <div class="card-art">
       <img v-if="release.albumArtUrl" :src="coverSrc(release.albumArtUrl)" :alt="`${release.artist} - ${release.title}`" />
       <div v-else class="art-placeholder">
@@ -23,7 +25,7 @@
         <HalfStarRating :modelValue="release.rating" readonly />
       </div>
     </div>
-    <div class="card-actions" @click.stop>
+    <div class="card-actions">
       <slot name="actions" />
     </div>
   </div>
@@ -36,12 +38,18 @@ import CountryLabel from '@/components/common/CountryLabel.vue'
 import Tag from 'primevue/tag'
 import type { Release } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   release: Release
   /** Shows when the album was added, for lists ordered by it. */
   showAdded?: boolean
 }>()
-defineEmits<{ click: [release: Release] }>()
+const emit = defineEmits<{ click: [release: Release] }>()
+
+/** Opens the release, unless the click belongs to one of the card's actions. */
+function open(event: Event) {
+  if ((event.target as HTMLElement).closest('.card-actions')) return
+  emit('click', props.release)
+}
 
 function formatAdded(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -58,6 +66,11 @@ function formatAdded(iso: string) {
   background: var(--tk-surface);
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.release-card:focus-visible {
+  outline: 2px solid var(--tk-accent);
+  outline-offset: 2px;
 }
 
 .release-card:hover {

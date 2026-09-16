@@ -9,7 +9,7 @@
   >
     <div v-if="release" class="quick-log-content">
       <div class="release-summary">
-        <img v-if="release.albumArtUrl" :src="coverSrc(release.albumArtUrl)" class="summary-art" />
+        <img v-if="release.albumArtUrl" :src="coverSrc(release.albumArtUrl)" class="summary-art" alt="" />
         <div>
           <div class="summary-title">{{ release.title }}</div>
           <div class="summary-artist">{{ release.artist }}</div>
@@ -19,23 +19,23 @@
       <Divider />
 
       <div class="log-field">
-        <label class="tk-label">Rating</label>
-        <HalfStarRating v-model="form.rating" :cancel="true" />
+        <span id="log-rating-label" class="tk-label">Rating</span>
+        <HalfStarRating v-model="form.rating" :cancel="true" aria-labelledby="log-rating-label" />
       </div>
 
       <div class="log-field">
-        <label class="tk-label">Genres</label>
-        <GenreTagInput v-model="form.genres" />
+        <label class="tk-label" for="log-genres">Genres</label>
+        <GenreTagInput v-model="form.genres" input-id="log-genres" />
       </div>
 
       <div class="log-field">
-        <label class="tk-label">Country</label>
-        <CountrySelect v-model="form.country" fluid />
+        <span id="log-country-label" class="tk-label">Country</span>
+        <CountrySelect v-model="form.country" fluid aria-labelledby="log-country-label" />
       </div>
 
       <div class="log-field">
-        <label class="tk-label">Notes</label>
-        <Textarea v-model="form.notes" rows="3" placeholder="Your thoughts..." fluid />
+        <label class="tk-label" for="log-notes">Notes</label>
+        <Textarea id="log-notes" v-model="form.notes" rows="3" placeholder="Your thoughts..." fluid />
       </div>
 
       <div class="log-field-inline">

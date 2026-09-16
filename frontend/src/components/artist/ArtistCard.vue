@@ -1,11 +1,8 @@
 <template>
-  <div
+  <RouterLink
+    :to="{ name: 'artist', params: { id: artist.id } }"
     class="artist-card"
     :class="{ 'is-checked': artist.status === 'CHECKED' }"
-    role="link"
-    tabindex="0"
-    @click="$emit('click', artist)"
-    @keydown.enter="$emit('click', artist)"
   >
     <ArtistAvatar :artist="artist" :size="72" />
 
@@ -25,7 +22,7 @@
       <i :class="artist.verdict ? VERDICTS[artist.verdict].icon : 'pi pi-check'" />
       {{ verdictLabel(artist) }}
     </div>
-  </div>
+  </RouterLink>
 </template>
 
 <script setup lang="ts">
@@ -36,7 +33,6 @@ import { describeArtist, verdictLabel, VERDICTS } from '@/utils/artists'
 import type { Artist } from '@/types'
 
 defineProps<{ artist: Artist }>()
-defineEmits<{ click: [artist: Artist] }>()
 </script>
 
 <style scoped>
@@ -49,6 +45,8 @@ defineEmits<{ click: [artist: Artist] }>()
   border-radius: 14px;
   background: var(--tk-surface);
   cursor: pointer;
+  color: inherit;
+  text-decoration: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 

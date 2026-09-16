@@ -103,12 +103,12 @@ export function isMainRelease(entry: Pick<DiscographyEntry, 'secondaryTypes'>): 
   return entry.secondaryTypes.length === 0
 }
 
-export function visibleDiscography(entries: DiscographyEntry[], showAll: boolean): DiscographyEntry[] {
-  // An album you already track stays visible whatever its type.
-  return showAll ? entries : entries.filter((e) => isMainRelease(e) || e.library)
+/** The discography with extras hidden. An album you already track stays, whatever its type. */
+export function mainDiscography(entries: DiscographyEntry[]): DiscographyEntry[] {
+  return entries.filter((e) => isMainRelease(e) || e.library)
 }
 
 /** The first letter shown when an artist has no picture. */
 export function initial(name: string): string {
-  return (name.trim().match(/\p{L}|\p{N}/u)?.[0] ?? '?').toUpperCase()
+  return (/\p{L}|\p{N}/u.exec(name.trim())?.[0] ?? '?').toUpperCase()
 }

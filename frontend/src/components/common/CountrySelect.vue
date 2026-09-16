@@ -10,6 +10,7 @@
     auto-filter-focus
     filter-placeholder="Find a country..."
     :placeholder="placeholder"
+    aria-label="Country"
     v-bind="$attrs"
     @update:model-value="(v: string | null) => emit('update:modelValue', v)"
   >

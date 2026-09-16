@@ -37,12 +37,11 @@
         <!-- Info -->
         <div class="hero-info">
           <!-- Title -->
-          <h1
-            v-if="editingField !== 'title'"
-            class="entry-title editable-field"
-            @click="startEdit('title', release.title)"
-          >
-            {{ release.title }}<i class="pi pi-pencil edit-hint" />
+          <!-- Buttons inside the headings, so each field can be reached and edited from the keyboard. -->
+          <h1 v-if="editingField !== 'title'" class="entry-title">
+            <button type="button" class="editable-field" @click="startEdit('title', release.title)">
+              {{ release.title }}<i class="pi pi-pencil edit-hint" />
+            </button>
           </h1>
           <InputText
             v-else
@@ -55,12 +54,10 @@
           />
 
           <!-- Artist -->
-          <h2
-            v-if="editingField !== 'artist'"
-            class="entry-artist editable-field"
-            @click="startEdit('artist', release.artist)"
-          >
-            {{ release.artist }}<i class="pi pi-pencil edit-hint" />
+          <h2 v-if="editingField !== 'artist'" class="entry-artist">
+            <button type="button" class="editable-field" @click="startEdit('artist', release.artist)">
+              {{ release.artist }}<i class="pi pi-pencil edit-hint" />
+            </button>
           </h2>
           <InputText
             v-else
@@ -88,13 +85,14 @@
             />
 
             <!-- Year -->
-            <span
+            <button
               v-if="editingField !== 'releaseYear'"
+              type="button"
               class="meta-pill editable"
               @click="startEdit('releaseYear', release.releaseYear)"
             >
               {{ release.releaseYear ?? 'add year' }}
-            </span>
+            </button>
             <InputNumber
               v-else
               v-focus
@@ -107,14 +105,15 @@
             />
 
             <!-- Country -->
-            <span
+            <button
               v-if="editingField !== 'country'"
+              type="button"
               class="meta-pill editable"
               @click="startCountryEdit"
             >
               <CountryLabel v-if="release.country" :value="release.country" />
               <template v-else>add country</template>
-            </span>
+            </button>
             <!-- Picking saves at once. Closing the list without a pick, by Escape or a click
                  elsewhere, cancels, unless the close is the one that follows a pick. -->
             <CountrySelect
@@ -128,9 +127,9 @@
 
             <!-- Date listened -->
             <template v-if="release.status === 'LISTENED'">
-              <span class="meta-pill editable" @click="openDatePicker($event)">
+              <button type="button" class="meta-pill editable" @click="openDatePicker($event)">
                 {{ release.dateListened ? formatDate(release.dateListened) : 'add date' }}
-              </span>
+              </button>
               <Popover ref="datePopoverRef">
                 <DatePicker
                   v-model="dateDraft"
@@ -175,6 +174,7 @@
           v-model="notesDraft"
           rows="4"
           placeholder="Your thoughts..."
+          aria-label="Notes"
           fluid
           @blur="saveNotes"
           class="notes-textarea"
@@ -257,6 +257,7 @@ import { releasesApi } from '@/api/releases'
 import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
 import type { Release } from '@/types'
+import { streamingService } from '@/utils/links'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
@@ -420,11 +421,7 @@ async function updateGenres(genres: string[]) {
 async function addLink() {
   if (!release.value || !newLinkUrl.value.trim()) return
   const url = newLinkUrl.value.trim()
-  const service = url.includes('spotify.com') ? 'spotify'
-    : url.includes('tidal.com') ? 'tidal'
-    : url.includes('youtube.com') || url.includes('youtu.be') ? 'youtube'
-    : 'other'
-  const links = { ...(release.value.streamingLinks ?? {}), [service]: url }
+  const links = { ...release.value.streamingLinks, [streamingService(url)]: url }
   release.value = await releasesStore.updateRelease(release.value.id, { streamingLinks: links })
   newLinkUrl.value = ''
   addingLink.value = false
@@ -530,7 +527,7 @@ function capitalize(s: string) {
   align-items: center;
   justify-content: center;
   font-size: 3rem;
-  color: rgba(226, 228, 240, 0.2);
+  color: rgba(226, 228, 240, 0.55);
 }
 
 /* ─── Info column ─── */
@@ -562,6 +559,14 @@ function capitalize(s: string) {
   display: inline-flex;
   align-items: baseline;
   gap: 0.4rem;
+  /* A button that looks like the heading around it. */
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border-radius: 4px;
 }
 
 .edit-hint {
@@ -572,7 +577,8 @@ function capitalize(s: string) {
   flex-shrink: 0;
 }
 
-.editable-field:hover .edit-hint {
+.editable-field:hover .edit-hint,
+.editable-field:focus-visible .edit-hint {
   opacity: 1;
 }
 
@@ -624,9 +630,12 @@ function capitalize(s: string) {
 
 .meta-pill.editable {
   cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
 }
 
-.meta-pill.editable:hover {
+.meta-pill.editable:hover,
+.meta-pill.editable:focus-visible {
   background: rgba(0, 229, 176, 0.08);
   border-color: rgba(0, 229, 176, 0.3);
 }

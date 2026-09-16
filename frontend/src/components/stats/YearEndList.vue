@@ -12,7 +12,7 @@
     <div v-if="entries.length" class="ye-list">
       <div v-for="entry in entries" :key="entry.rank" class="ye-item">
         <span class="rank">{{ entry.rank }}</span>
-        <img v-if="entry.release.albumArtUrl" :src="coverSrc(entry.release.albumArtUrl)" class="item-art" />
+        <img v-if="entry.release.albumArtUrl" :src="coverSrc(entry.release.albumArtUrl)" class="item-art" alt="" />
         <div class="item-info">
           <RouterLink :to="`/entry/${entry.release.id}`" class="item-title">
             {{ entry.release.artist }} – {{ entry.release.title }}

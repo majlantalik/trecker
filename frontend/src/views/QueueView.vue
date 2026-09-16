@@ -175,7 +175,11 @@ async function pickRandom() {
     selectedRelease.value = release
     showLogModal.value = true
   } catch (e: any) {
-    toast.add({ severity: 'warn', summary: 'No queued releases found', life: 2000 })
+    if (e?.code === 'NOT_FOUND') {
+      toast.add({ severity: 'warn', summary: 'No queued releases found', life: 2000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Failed', detail: e?.message, life: 3000 })
+    }
   } finally {
     pickingRandom.value = false
   }

@@ -34,7 +34,7 @@ export function countryFlag(value: string | null | undefined): string | null {
   // XA-XZ and ZZ are user-assigned and have no flag. MusicBrainz uses XW for "worldwide".
   if (code.startsWith('X') || code === 'ZZ') return null
   return String.fromCodePoint(
-    ...[...code].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+    ...[...code].map((c) => 0x1f1e6 + c.codePointAt(0)! - 65)
   )
 }
 
