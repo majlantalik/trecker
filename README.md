@@ -91,7 +91,8 @@ matches on artist, title and year are linked on their own, and the rest wait for
 pick, one after another.
 
 When MusicBrainz does not have the album at all, and it has a Spotify, Tidal, Deezer, Apple
-Music, Bandcamp or Beatport link, the list offers **Add to MusicBrainz**. It opens
+Music, Bandcamp or Beatport link, the album picker and the match's "Nothing found" list offer
+**Add to MusicBrainz**. It opens
 [Harmony](https://harmony.pulsewidth.org.uk) on those links, which fills in MusicBrainz's
 "Add release" form for you to check and submit with your MusicBrainz account. Refresh the
 album a few minutes later to link it.

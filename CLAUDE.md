@@ -190,7 +190,8 @@ The rules that follow:
   album being linked has a Spotify, Tidal, Deezer, Apple Music, Bandcamp or Beatport link,
   `AlbumPicker` shows "Add to MusicBrainz", which opens Harmony's lookup of those links from
   `harmonyLookupUrl` in `utils/links.ts`. The album page opens the picker for it even when the
-  search found nothing. Trecker never submits anything to MusicBrainz itself.
+  search found nothing, and the Info view's "Nothing found on MusicBrainz" list links each album
+  the same way. Trecker never submits anything to MusicBrainz itself.
 - **"Release group" never reaches the interface.** The UI says album and the export field
   stays `musicbrainzId`. Code, schema and developer docs use the precise term.
 
