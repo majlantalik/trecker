@@ -13,7 +13,7 @@
           icon="pi pi-refresh"
           severity="secondary"
           text
-          :loading="refreshing"
+          :loading="refreshing || albumLink.searching.value"
           v-tooltip.bottom="'Refresh metadata from MusicBrainz'"
           aria-label="Refresh metadata"
           @click="refreshMetadata"
@@ -221,6 +221,14 @@
 
     <QuickLogModal v-model:visible="showLogModal" :release="release" @logged="onLogged" />
     <ConfirmDialog :pt="{ root: { class: 'tk-dialog' } }" />
+    <AlbumPicker
+      v-model:visible="albumLink.pickerVisible.value"
+      :candidates="albumLink.candidates.value"
+      :query="albumLink.query.value"
+      :choosing-id="albumLink.choosingId.value"
+      @choose="linkAlbum"
+      @none="albumLink.pickerVisible.value = false"
+    />
   </div>
 
   <div v-else-if="loading" class="loading-state">
@@ -252,11 +260,13 @@ import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import CountryLabel from '@/components/common/CountryLabel.vue'
 import CountrySelect from '@/components/common/CountrySelect.vue'
 import QuickLogModal from '@/components/release/QuickLogModal.vue'
+import AlbumPicker from '@/components/release/AlbumPicker.vue'
+import { useAlbumLink } from '@/composables/useAlbumLink'
 import GenreTagInput from '@/components/release/GenreTagInput.vue'
 import { releasesApi } from '@/api/releases'
 import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
-import type { Release } from '@/types'
+import type { AlbumCandidate, Release } from '@/types'
 import { streamingService } from '@/utils/links'
 
 const props = defineProps<{ id: string }>()
@@ -278,6 +288,7 @@ const newLinkUrl = ref('')
 const datePopoverRef = ref<InstanceType<typeof Popover> | null>(null)
 const dateDraft = ref<Date | null>(null)
 const refreshing = ref(false)
+const albumLink = useAlbumLink()
 
 // Auto-focus directive for inline edit inputs
 const vFocus = {
@@ -294,55 +305,112 @@ watch(() => release.value?.notes, (notes) => {
   notesDraft.value = notes ?? ''
 })
 
-onMounted(async () => {
+async function load(id: string) {
+  loading.value = true
   try {
-    release.value = await releasesApi.getById(props.id)
+    release.value = await releasesApi.getById(id)
   } catch {
     release.value = null
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(() => load(props.id))
+// The router reuses this view from one album to another, as when a duplicate found while
+// linking is opened, so a new id has to load rather than wait for a mount that never comes.
+watch(() => props.id, (id) => load(id))
 
 // Metadata is fetched once when a release is added and never again, so improvements to
 // the resolver only ever help new additions. This is the repair path for the rest.
 // Catalog fields only: rating, notes, status and links are untouched.
+//
+// An album with no MusicBrainz id, typed in or imported, is not refreshed by a search that
+// picks for you: the search opens the album list and the person chooses. See useAlbumLink.
 async function refreshMetadata() {
-  if (!release.value || refreshing.value) return
+  if (!release.value || refreshing.value || albumLink.searching.value) return
   refreshing.value = true
+  const before = release.value
   try {
-    const before = release.value
-    const updated = await releasesApi.refreshMetadata(release.value.id)
-    release.value = updated
-
-    const changes = [
-      before.albumArtUrl !== updated.albumArtUrl && 'artwork',
-      before.releaseYear !== updated.releaseYear && 'year',
-      before.country !== updated.country && 'country',
-      before.genres.join() !== updated.genres.join() && 'genres',
-      before.artist !== updated.artist && 'artist',
-      before.title !== updated.title && 'title'
-    ].filter(Boolean)
-
-    toast.add({
-      severity: changes.length ? 'success' : 'info',
-      summary: changes.length ? 'Metadata updated' : 'Already up to date',
-      detail: changes.length ? `Changed: ${changes.join(', ')}.` : 'Nothing new to fetch.',
-      life: 4000
-    })
-
-    // fetchGenres() short-circuits once loaded, so feed new names in directly.
-    updated.genres.forEach((g) => genresStore.addGenre(g))
+    announceChanges(before, await releasesApi.refreshMetadata(before.id))
   } catch (e: any) {
-    toast.add({
-      severity: 'error',
-      summary: 'Refresh failed',
-      detail: e?.message ?? 'Could not reach MusicBrainz.',
-      life: 5000
-    })
+    if (e?.code === 'NOT_LINKED') {
+      refreshing.value = false
+      await chooseAlbum(before)
+    } else {
+      refreshFailed(e)
+    }
   } finally {
     refreshing.value = false
   }
+}
+
+async function chooseAlbum(current: Release) {
+  const outcome = await albumLink.search(current)
+  if (outcome === 'none') {
+    toast.add({
+      severity: 'info',
+      summary: 'No matches',
+      detail: `MusicBrainz has nothing for ${albumLink.query.value}. Nothing was changed.`,
+      life: 5000
+    })
+  } else if (outcome === 'failed') {
+    refreshFailed({ message: albumLink.error.value })
+  }
+}
+
+async function linkAlbum(candidate: AlbumCandidate) {
+  const before = release.value
+  if (!before) return
+  try {
+    const updated = await albumLink.choose(before.id, candidate)
+    if (updated) announceChanges(before, updated)
+  } catch (e: any) {
+    if (e?.code === 'ALREADY_IN_LIBRARY' && e.releaseId) {
+      confirm.require({
+        header: 'Already in your library',
+        message: `${capitalize(e.message)}. Nothing was changed. Open that one?`,
+        icon: 'pi pi-clone',
+        rejectProps: { label: 'Stay here', severity: 'secondary', outlined: true },
+        acceptProps: { label: 'Open it' },
+        accept: () => router.push(`/entry/${e.releaseId}`)
+      })
+    } else {
+      refreshFailed(e)
+    }
+  }
+}
+
+function announceChanges(before: Release, updated: Release) {
+  release.value = updated
+
+  const changes = [
+    before.albumArtUrl !== updated.albumArtUrl && 'artwork',
+    before.releaseYear !== updated.releaseYear && 'year',
+    before.country !== updated.country && 'country',
+    before.genres.join() !== updated.genres.join() && 'genres',
+    before.artist !== updated.artist && 'artist',
+    before.title !== updated.title && 'title'
+  ].filter(Boolean)
+
+  toast.add({
+    severity: changes.length ? 'success' : 'info',
+    summary: changes.length ? 'Metadata updated' : 'Already up to date',
+    detail: changes.length ? `Changed: ${changes.join(', ')}.` : 'Nothing new to fetch.',
+    life: 4000
+  })
+
+  // fetchGenres() short-circuits once loaded, so feed new names in directly.
+  updated.genres.forEach((g) => genresStore.addGenre(g))
+}
+
+function refreshFailed(e: any) {
+  toast.add({
+    severity: 'error',
+    summary: 'Refresh failed',
+    detail: e?.message ?? 'Could not reach MusicBrainz.',
+    life: 5000
+  })
 }
 
 function onLogged(updated: Release) {

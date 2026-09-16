@@ -5,7 +5,7 @@ use super::{hydrate, map_err, new_id, now, push_id_list, RELEASE_COLUMNS};
 use crate::db::LOCAL_USER_ID;
 use crate::domain::{
     PageResponse, Release, ReleaseFilterParams, ReleaseRequest, ReleaseStatus, ReleaseUpdateRequest,
-    ResolvedMetadata,
+    ResolvedMetadata, UnlinkedRelease,
 };
 use crate::error::{AppError, AppResult};
 use crate::library::{ExportedRelease, ImportMode};
@@ -368,6 +368,78 @@ pub async fn release_group_id(pool: &SqlitePool, release_id: &str) -> AppResult<
     .await
     .map_err(map_err)?;
     row.ok_or(AppError::NotFound("release"))
+}
+
+/// Sets the MusicBrainz release group a tracked release is, once the person has chosen it.
+///
+/// The id is UNIQUE in the catalog. When another release you track already has it, that is
+/// the same album twice, and this refuses rather than guessing whose rating and notes win.
+/// When the row holding it is one you no longer track, a leftover from a delete, the id
+/// moves here: that row stays, but nothing about your library depends on it.
+pub async fn link_release_group(pool: &SqlitePool, release_id: &str, group_id: &str) -> AppResult<()> {
+    let mut tx = pool.begin().await.map_err(map_err)?;
+
+    // Tracked, or not found. The same check `release_group_id` makes.
+    let tracked: Option<String> = sqlx::query_scalar(
+        "SELECT id FROM user_releases WHERE release_id = ? AND user_id = ?",
+    )
+    .bind(release_id)
+    .bind(LOCAL_USER_ID)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(map_err)?;
+    tracked.ok_or(AppError::NotFound("release"))?;
+
+    if let Some(holder) = find_catalog(&mut tx, Some(group_id)).await? {
+        if holder != release_id {
+            let other: Option<(String, String)> = sqlx::query_as(
+                "SELECT r.artist, r.title FROM releases r JOIN user_releases ur ON ur.release_id = r.id \
+                 WHERE r.id = ? AND ur.user_id = ?",
+            )
+            .bind(&holder)
+            .bind(LOCAL_USER_ID)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(map_err)?;
+
+            if let Some((artist, title)) = other {
+                return Err(AppError::AlreadyInLibrary { release_id: holder, artist, title });
+            }
+            sqlx::query("UPDATE releases SET musicbrainz_release_group_id = NULL WHERE id = ?")
+                .bind(&holder)
+                .execute(&mut *tx)
+                .await
+                .map_err(map_err)?;
+        }
+    }
+
+    sqlx::query("UPDATE releases SET musicbrainz_release_group_id = ? WHERE id = ?")
+        .bind(group_id)
+        .bind(release_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_err)?;
+
+    tx.commit().await.map_err(map_err)
+}
+
+/// Tracked releases with no MusicBrainz id, in the order they were added.
+pub async fn unlinked(pool: &SqlitePool) -> AppResult<Vec<UnlinkedRelease>> {
+    let rows: Vec<(String, String, String, Option<i32>)> = sqlx::query_as(
+        "SELECT r.id, r.artist, r.title, r.release_year FROM user_releases ur \
+         JOIN releases r ON r.id = ur.release_id \
+         WHERE ur.user_id = ? AND r.musicbrainz_release_group_id IS NULL \
+         ORDER BY ur.created_at, ur.id",
+    )
+    .bind(LOCAL_USER_ID)
+    .fetch_all(pool)
+    .await
+    .map_err(map_err)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, artist, title, release_year)| UnlinkedRelease { id, artist, title, release_year })
+        .collect())
 }
 
 pub async fn list_genres(pool: &SqlitePool) -> AppResult<Vec<String>> {

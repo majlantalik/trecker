@@ -6,6 +6,7 @@ import type {
   ResolveRequest,
   ResolvedMetadata,
   AlbumCandidate,
+  UnlinkedRelease,
   PageResponse,
   ReleaseFilterParams
 } from '@/types'
@@ -49,8 +50,22 @@ export const releasesApi = {
     await invoke<void>('releases_delete', { id })
   },
 
+  /** Refreshes a linked album by its id. One with no id fails with code NOT_LINKED. */
   async refreshMetadata(id: string): Promise<Release> {
     return invoke<Release>('releases_refresh_metadata', { id })
+  },
+
+  /**
+   * Links an album to the one chosen from a search and fills in its metadata. Fails with
+   * code ALREADY_IN_LIBRARY, and the `releaseId` to open, when you already track that album.
+   */
+  async link(id: string, releaseGroupId: string): Promise<Release> {
+    return invoke<Release>('releases_link', { id, releaseGroupId })
+  },
+
+  /** Every tracked album with no MusicBrainz id, oldest addition first. */
+  async unlinked(): Promise<UnlinkedRelease[]> {
+    return invoke<UnlinkedRelease[]>('releases_unlinked')
   },
 
   async searchCatalog(q: string, limit = 10): Promise<ResolvedMetadata[]> {

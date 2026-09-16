@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { ActivityDataPoint, BreakdownItem, Release, YearEndEntry } from '@/types'
+import type { ActivityDataPoint, BreakdownItem, YearEndBasis, YearEndEntry } from '@/types'
 
 export const statsApi = {
   async getActivity(): Promise<ActivityDataPoint[]> {
@@ -14,11 +14,7 @@ export const statsApi = {
     return invoke<BreakdownItem[]>('stats_by_country')
   },
 
-  async getTopRated(limit = 25): Promise<Release[]> {
-    return invoke<Release[]>('stats_top_rated', { limit })
-  },
-
-  async getYearEnd(year?: number): Promise<YearEndEntry[]> {
-    return invoke<YearEndEntry[]>('stats_year_end', { year })
+  async getYearEnd(year?: number, by: YearEndBasis = 'listened'): Promise<YearEndEntry[]> {
+    return invoke<YearEndEntry[]>('stats_year_end', { year, by })
   }
 }

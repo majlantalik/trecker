@@ -21,14 +21,12 @@
       </div>
 
       <div class="stats-full">
-        <TopRatedList :releases="statsStore.topRated" />
-      </div>
-
-      <div class="stats-full">
         <YearEndList
           :year="statsStore.selectedYear"
+          :by="statsStore.yearEndBy"
           :entries="statsStore.yearEnd"
           @year-change="statsStore.fetchYearEnd"
+          @by-change="statsStore.fetchYearEnd(undefined, $event)"
         />
       </div>
     </div>
@@ -41,7 +39,6 @@ import ProgressSpinner from 'primevue/progressspinner'
 import { useStatsStore } from '@/stores/stats'
 import ActivityChart from '@/components/stats/ActivityChart.vue'
 import BreakdownChart from '@/components/stats/BreakdownChart.vue'
-import TopRatedList from '@/components/stats/TopRatedList.vue'
 import YearEndList from '@/components/stats/YearEndList.vue'
 
 const statsStore = useStatsStore()

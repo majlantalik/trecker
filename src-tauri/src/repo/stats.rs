@@ -7,7 +7,7 @@
 
 use super::{hydrate, map_err, RELEASE_COLUMNS};
 use crate::db::LOCAL_USER_ID;
-use crate::domain::{ActivityDataPoint, BreakdownItem, Release, YearEndEntry};
+use crate::domain::{ActivityDataPoint, BreakdownItem, YearEndBasis, YearEndEntry};
 use crate::error::AppResult;
 use sqlx::{Row, SqlitePool};
 
@@ -79,42 +79,47 @@ async fn breakdown(pool: &SqlitePool, sql: &str) -> AppResult<Vec<BreakdownItem>
         .collect()
 }
 
-pub async fn top_rated(pool: &SqlitePool, limit: u32) -> AppResult<Vec<Release>> {
-    let sql = format!(
+/// How many albums a year-end list ranks.
+pub const YEAR_END_LIMIT: i64 = 20;
+
+pub async fn year_end(
+    pool: &SqlitePool,
+    year: i32,
+    basis: YearEndBasis,
+) -> AppResult<Vec<YearEndEntry>> {
+    let base = format!(
         "SELECT {RELEASE_COLUMNS} FROM user_releases ur JOIN releases r ON r.id = ur.release_id \
-         WHERE ur.user_id = ? AND ur.status = 'LISTENED' AND ur.rating IS NOT NULL \
-         ORDER BY ur.rating DESC, ur.date_listened DESC LIMIT ?"
+         WHERE ur.user_id = ? AND ur.status = 'LISTENED' AND ur.rating IS NOT NULL "
     );
-    let rows = sqlx::query(&sql)
-        .bind(LOCAL_USER_ID)
-        .bind(limit.max(1) as i64)
-        .fetch_all(pool)
-        .await
-        .map_err(map_err)?;
+    let order = "ORDER BY ur.rating DESC, ur.date_listened DESC, ur.id LIMIT ?";
 
-    hydrate(pool, rows).await
-}
-
-pub async fn year_end(pool: &SqlitePool, year: i32) -> AppResult<Vec<YearEndEntry>> {
-    // Half-open interval on the stored RFC3339 strings. They are UTC with a fixed width,
-    // so a lexical comparison is a chronological one, and this stays index-friendly in a
-    // way that wrapping the column in strftime() would not.
-    let start = format!("{year:04}-01-01T00:00:00Z");
-    let end = format!("{:04}-01-01T00:00:00Z", year + 1);
-
-    let sql = format!(
-        "SELECT {RELEASE_COLUMNS} FROM user_releases ur JOIN releases r ON r.id = ur.release_id \
-         WHERE ur.user_id = ? AND ur.status = 'LISTENED' AND ur.rating IS NOT NULL \
-           AND ur.date_listened >= ? AND ur.date_listened < ? \
-         ORDER BY ur.rating DESC, ur.date_listened DESC LIMIT 50"
-    );
-    let rows = sqlx::query(&sql)
-        .bind(LOCAL_USER_ID)
-        .bind(&start)
-        .bind(&end)
-        .fetch_all(pool)
-        .await
-        .map_err(map_err)?;
+    let rows = match basis {
+        YearEndBasis::Listened => {
+            // Half-open interval on the stored RFC3339 strings. They are UTC with a fixed
+            // width, so a lexical comparison is a chronological one, and this stays
+            // index-friendly in a way that wrapping the column in strftime() would not.
+            let start = format!("{year:04}-01-01T00:00:00Z");
+            let end = format!("{:04}-01-01T00:00:00Z", year + 1);
+            let sql = format!("{base}AND ur.date_listened >= ? AND ur.date_listened < ? {order}");
+            sqlx::query(&sql)
+                .bind(LOCAL_USER_ID)
+                .bind(start)
+                .bind(end)
+                .bind(YEAR_END_LIMIT)
+                .fetch_all(pool)
+                .await
+        }
+        YearEndBasis::Released => {
+            let sql = format!("{base}AND r.release_year = ? {order}");
+            sqlx::query(&sql)
+                .bind(LOCAL_USER_ID)
+                .bind(year)
+                .bind(YEAR_END_LIMIT)
+                .fetch_all(pool)
+                .await
+        }
+    }
+    .map_err(map_err)?;
 
     Ok(hydrate(pool, rows)
         .await?

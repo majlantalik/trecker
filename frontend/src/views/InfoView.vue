@@ -146,6 +146,86 @@
 
     <div class="info-section">
       <div class="section-header">
+        <i class="pi pi-link section-icon" />
+        <h2 class="section-title">Match to MusicBrainz</h2>
+      </div>
+      <div class="section-body">
+        <p class="stat-row">
+          <span class="stat-label">Albums not linked</span>
+          <span class="stat-value">{{ match.unlinkedCount ?? '–' }}</span>
+        </p>
+
+        <div class="transfer-row">
+          <span class="stat-label">
+            {{ match.running ? `Matching ${match.processed} of ${match.total}` : 'Find each one on MusicBrainz' }}
+          </span>
+          <span class="transfer-buttons">
+            <Button v-if="!match.running" label="Match albums" icon="pi pi-search" size="small" outlined
+                    :disabled="!match.unlinkedCount" @click="match.run()" />
+            <Button v-else :label="match.stopping ? 'Stopping' : 'Stop'" icon="pi pi-stop" size="small" outlined
+                    severity="secondary" :disabled="match.stopping" @click="match.stop()" />
+          </span>
+        </div>
+        <div v-if="match.running" class="match-progress" role="progressbar" aria-label="Matching albums"
+             :aria-valuemin="0" :aria-valuemax="match.total" :aria-valuenow="match.processed">
+          <div class="match-progress-fill" :style="{ width: `${progressPercent}%` }" />
+        </div>
+        <p class="form-hint">
+          An album whose artist, title and year match exactly one album on MusicBrainz is linked
+          straight away; the rest wait for you to choose. Linking replaces the artist, title,
+          year, cover and country, and adds MusicBrainz's genres to yours. MusicBrainz allows one
+          request a second, so this takes two to three seconds an album. You can leave this page
+          while it runs.
+        </p>
+
+        <p v-if="match.error" class="db-error">{{ match.error }}</p>
+        <p v-if="match.running || match.finished" class="transfer-result">
+          <i class="pi pi-check-circle" />
+          {{ matchSummary }}
+        </p>
+
+        <div v-if="match.toReview.length" class="transfer-row">
+          <span class="stat-label">
+            {{ match.toReview.length === 1 ? '1 album needs' : `${match.toReview.length} albums need` }} your choice
+          </span>
+          <Button label="Review" icon="pi pi-list-check" size="small" @click="reviewing = true" />
+        </div>
+
+        <div v-if="match.duplicates.length" class="rejected">
+          <p class="rejected-title">Already in your library</p>
+          <p v-for="d in match.duplicates" :key="d.release.id" class="rejected-row">
+            <span class="rejected-name">{{ d.release.artist }} &mdash; {{ d.release.title }}</span>
+            <RouterLink v-if="d.existingId" :to="`/entry/${d.existingId}`" class="match-open">Open the other one</RouterLink>
+          </p>
+        </div>
+        <div v-if="match.noMatches.length" class="rejected">
+          <p class="rejected-title">Nothing found on MusicBrainz</p>
+          <p v-for="r in match.noMatches" :key="r.id" class="rejected-row">
+            <RouterLink :to="`/entry/${r.id}`" class="rejected-name">{{ r.artist }} &mdash; {{ r.title }}</RouterLink>
+          </p>
+        </div>
+        <div v-if="match.failed.length" class="rejected">
+          <p class="rejected-title">Could not be linked</p>
+          <p v-for="f in match.failed" :key="f.release.id" class="rejected-row">
+            <span class="rejected-name">{{ f.release.artist }} &mdash; {{ f.release.title }}</span>
+            <span class="rejected-reason">{{ f.reason }}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <AlbumPicker
+      v-model:visible="reviewVisible"
+      :candidates="match.current?.candidates ?? []"
+      :query="match.current ? `${match.current.release.artist} - ${match.current.release.title}` : ''"
+      :choosing-id="match.choosingId"
+      :remaining="match.toReview.length - 1"
+      @choose="match.choose"
+      @none="match.decline()"
+    />
+
+    <div class="info-section">
+      <div class="section-header">
         <i class="pi pi-download section-icon" />
         <h2 class="section-title">Backup</h2>
       </div>
@@ -211,18 +291,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import Tag from 'primevue/tag'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { releasesApi } from '@/api/releases'
 import { infoApi } from '@/api/info'
 import { useLibraryTransfer } from '@/composables/useLibraryTransfer'
+import { useAlbumMatchStore } from '@/stores/albumMatch'
+import AlbumPicker from '@/components/release/AlbumPicker.vue'
 import { useCaches, describeCovers } from '@/composables/useCaches'
 import { formatBytes } from '@/utils/bytes'
 import type { DbInfo, ImportMode } from '@/types'
 
 const transfer = useLibraryTransfer()
+const match = useAlbumMatchStore()
+
+// Closing the review with Esc or the close button pauses it; the albums stay in the list.
+const reviewing = ref(false)
+const reviewVisible = computed({
+  get: () => reviewing.value && match.current !== null,
+  set: (open: boolean) => { reviewing.value = open }
+})
+const progressPercent = computed(() => (match.total ? Math.round((match.processed / match.total) * 100) : 0))
+const matchSummary = computed(() => {
+  const parts = [`${match.linked} linked`]
+  if (match.toReview.length) parts.push(`${match.toReview.length} to review`)
+  if (match.declined) parts.push(`${match.declined} left as they were`)
+  if (match.noMatches.length) parts.push(`${match.noMatches.length} not found`)
+  if (match.duplicates.length) parts.push(`${match.duplicates.length} already in your library`)
+  if (match.failed.length) parts.push(`${match.failed.length} failed`)
+  return parts.join(', ')
+})
 const caches = useCaches()
 
 // Named for what happens to a release already in your library, because that is the only
@@ -254,6 +355,7 @@ const providers = [
 
 onMounted(async () => {
   caches.load()
+  if (!match.running) match.countUnlinked()
 
   const [all, queued, listened] = await Promise.all([
     releasesApi.getAll({ size: 1 }),
@@ -402,6 +504,8 @@ onMounted(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Right to left so a long path loses its start, not its file name. The <bdi> inside keeps
+     the path itself left to right, or its leading slash is drawn at the end. */
   direction: rtl;
   text-align: right;
   min-width: 0;
@@ -474,11 +578,36 @@ onMounted(async () => {
   text-align: right;
 }
 
+.match-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.match-progress-fill {
+  height: 100%;
+  background: var(--tk-accent);
+  transition: width 0.3s ease;
+}
+
+.match-open {
+  color: var(--tk-accent);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.rejected-row a.rejected-name {
+  text-decoration: none;
+}
+
+.rejected-row a.rejected-name:hover {
+  color: var(--tk-accent);
+}
+
 .db-error {
   color: #f43f5e;
   font-size: 0.85rem;
   margin: 0;
 }
 </style>
-  /* Right to left so a long path loses its start, not its file name. The <bdi> inside keeps
-     the path itself left to right, or its leading slash is drawn at the end. */

@@ -92,6 +92,19 @@ describe('releases commands', () => {
     expect(invoke).toHaveBeenCalledWith('releases_refresh_metadata', { id: 'abc' })
   })
 
+  it('unlinked takes no arguments', async () => {
+    await releasesApi.unlinked()
+    expect(invoke).toHaveBeenCalledWith('releases_unlinked')
+  })
+
+  it('link sends the release and the chosen album', async () => {
+    await releasesApi.link('abc', '180560ee-2d9d-33cf-8de7-cdaaba610739')
+    expect(invoke).toHaveBeenCalledWith('releases_link', {
+      id: 'abc',
+      releaseGroupId: '180560ee-2d9d-33cf-8de7-cdaaba610739'
+    })
+  })
+
   it('searchCatalog applies the default limit', async () => {
     await releasesApi.searchCatalog('slint')
     expect(invoke).toHaveBeenCalledWith('releases_search_catalog', { q: 'slint', limit: 10 })
@@ -167,14 +180,14 @@ describe('stats commands', () => {
     expect(invoke).toHaveBeenCalledWith('stats_by_country')
   })
 
-  it('topRated applies the default limit', async () => {
-    await statsApi.getTopRated()
-    expect(invoke).toHaveBeenCalledWith('stats_top_rated', { limit: 25 })
+  it('yearEnd forwards an absent year as undefined and ranks by listen date', async () => {
+    await statsApi.getYearEnd()
+    expect(invoke).toHaveBeenCalledWith('stats_year_end', { year: undefined, by: 'listened' })
   })
 
-  it('yearEnd forwards an absent year as undefined', async () => {
-    await statsApi.getYearEnd()
-    expect(invoke).toHaveBeenCalledWith('stats_year_end', { year: undefined })
+  it('yearEnd sends the year and the basis', async () => {
+    await statsApi.getYearEnd(2022, 'released')
+    expect(invoke).toHaveBeenCalledWith('stats_year_end', { year: 2022, by: 'released' })
   })
 })
 

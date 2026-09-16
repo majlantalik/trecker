@@ -7,7 +7,9 @@
     :pt="{ root: { class: 'tk-dialog ap-root' } }"
   >
     <p class="ap-subtitle">
-      {{ candidates.length }} matches on MusicBrainz for <strong>{{ query }}</strong>
+      {{ candidates.length }} {{ candidates.length === 1 ? 'match' : 'matches' }} on MusicBrainz for
+      <strong>{{ query }}</strong>
+      <template v-if="remaining"> · {{ remaining }} more after this</template>
     </p>
 
     <!-- `autofocus` on the list, because once its opening animation ends the dialog focuses
@@ -68,14 +70,17 @@ import { describeCandidate } from '@/utils/candidates'
 import type { AlbumCandidate } from '@/types'
 
 /**
- * The list quick add shows when a search matches more than one album. Choosing one hands
- * it back; the parent fetches its details and opens the add form.
+ * A list of albums from a MusicBrainz search to choose from. Quick add shows it when a
+ * search matches more than one; refreshing an album with no id shows it for any match.
+ * Choosing one hands it back and the parent decides what happens next.
  */
 const props = defineProps<{
   candidates: AlbumCandidate[]
   query: string
   /** The candidate being looked up, which shows a spinner and blocks another pick. */
   choosingId: string | null
+  /** Albums still waiting after this one, when the picker is walking through several. */
+  remaining?: number
 }>()
 
 const emit = defineEmits<{ choose: [candidate: AlbumCandidate]; none: [] }>()
