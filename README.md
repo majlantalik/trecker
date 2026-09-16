@@ -81,7 +81,14 @@ Navigation follows Gmail: <kbd>G</kbd> then the first letter of where you are go
 
 Metadata is fetched once when you add a release. If it came back wrong or incomplete, the
 refresh button on a release's page fetches it again. It replaces artist, title, year,
-country, artwork and genres, and never touches your rating, notes, dates or links.
+country and artwork, adds any genres you do not have, and never touches your rating, notes,
+dates or links.
+
+An album typed in by hand or imported has no MusicBrainz id, so refresh cannot know which
+album it is. It searches instead and lets you choose from the results, and remembers the
+choice. **Info → Match to MusicBrainz** does this for every such album at once: exact
+matches on artist, title and year are linked on their own, and the rest wait for you to
+pick, one after another.
 
 ### Library
 
@@ -112,8 +119,9 @@ connection; everything else works offline. Why artists work this way:
 
 ### Stats
 
-Listening activity by month, breakdowns by genre and country, your top-rated releases, and
-a ranked year-end list for any year.
+Listening activity by month, breakdowns by genre and country, and a year-end list of your
+twenty highest-rated albums for any year, by the year you heard them or the year they came
+out.
 
 ### Quick add from anywhere
 
@@ -244,8 +252,8 @@ Iterate with `npm run dev`, not with `npm run build`.
 ### Tests
 
 ```bash
-npm test           # 211 frontend tests
-npm run test:rust  # 166 Rust tests
+npm test           # 248 frontend tests
+npm run test:rust  # 177 Rust tests
 npm run test:net   # 14 tests against the live metadata services
 ```
 
@@ -270,7 +278,7 @@ trecker/
 │       │   ├── queue/        QueueActions
 │       │   ├── release/      QuickAddBar, ReleaseCard, ReleaseForm,
 │       │   │                 QuickLogModal, GenreTagInput
-│       │   └── stats/        ActivityChart, BreakdownChart, TopRatedList, YearEndList
+│       │   └── stats/        ActivityChart, BreakdownChart, YearEndList
 │       ├── composables/      keyboard shortcuts, useLibraryTransfer, useCaches
 │       ├── stores/           releases.ts, artists.ts, genres.ts, stats.ts (Pinia)
 │       ├── types/index.ts    single source of truth for TS interfaces
@@ -300,7 +308,7 @@ Art Archive are open, and everything else is local.
 
 ### Command surface
 
-Thirty-five Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
+Thirty-six Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 
 | Command | Purpose |
 |---|---|
@@ -313,7 +321,9 @@ Thirty-five Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `releases_get` | Fetch one release |
 | `releases_update` | Partial update; `status=LISTENED` stamps `dateListened` |
 | `releases_delete` | Stop tracking; the catalog row stays |
-| `releases_refresh_metadata` | Re-fetch catalog fields for an existing release |
+| `releases_refresh_metadata` | Re-fetch catalog fields for a release linked to MusicBrainz |
+| `releases_link` | Link a release to the album chosen from a search, and fetch its metadata |
+| `releases_unlinked` | Releases with no MusicBrainz id, for matching them in bulk |
 | `releases_search_catalog` | Full-text autocomplete over the catalog |
 | `artists_search` | Up to ten artists matching typed text |
 | `artists_add` | Look an artist up and put them on your list |
@@ -327,8 +337,7 @@ Thirty-five Tauri commands, mapping 1:1 onto `frontend/src/api/*.ts`:
 | `stats_activity` | Listening count by year and month |
 | `stats_by_genre` | Breakdown by genre |
 | `stats_by_country` | Breakdown by country |
-| `stats_top_rated` | Top-rated listened releases |
-| `stats_year_end` | Ranked list for a year |
+| `stats_year_end` | Top twenty for a year, by listen date or release year |
 | `info_db` | Database path, size, schema version, pragmas |
 | `library_export` | Write the whole library to a JSON or CSV file |
 | `library_import` | Read one back, skipping or overwriting what matches |

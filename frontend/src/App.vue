@@ -21,7 +21,8 @@ import AppLayout from '@/components/layout/AppLayout.vue'
   --tk-border: rgba(255, 255, 255, 0.07);
   --tk-border-hover: rgba(255, 255, 255, 0.14);
   --tk-text: #e2e4f0;
-  --tk-text-muted: #5a6080;
+  /* Secondary text and icons: 5.7:1 on --tk-surface, 5.2:1 on --tk-surface-hover. */
+  --tk-text-muted: #8a90b0;
   --tk-accent: #00e5b0;
   --tk-accent-hover: #00ffc8;
   --tk-accent-dim: rgba(0, 229, 176, 0.12);
@@ -40,9 +41,15 @@ html, body {
   background: var(--tk-bg);
 }
 
+/* The base size lives on html, not body: every size in the app and in PrimeVue's theme is in
+   rem, which is relative to the root element and ignores body. */
+html {
+  font-size: 18px;
+}
+
 body {
   font-family: var(--tk-font-body);
-  font-size: 18px;
+  font-size: 1rem;
   color: var(--tk-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -190,8 +197,7 @@ textarea {
   }
 }
 
-/* A form field's label, in the uppercase style of the library filters' labels. Brighter
-   than theirs, which use --tk-text-muted and are too faint to read on a dialog panel. */
+/* A form field's label, in the uppercase style of the library filters' labels. */
 .tk-label {
   font-size: 0.72rem;
   font-weight: 600;

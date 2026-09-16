@@ -278,7 +278,7 @@ onMounted(async () => {
 
 .choice-description {
   font-size: 0.78rem;
-  color: rgba(226, 228, 240, 0.5);
+  color: rgba(226, 228, 240, 0.6);
 }
 
 .section-text {
@@ -307,7 +307,7 @@ onMounted(async () => {
 
 .form-hint {
   font-size: 0.75rem;
-  color: rgba(226, 228, 240, 0.45);
+  color: rgba(226, 228, 240, 0.6);
   margin: 0;
 }
 

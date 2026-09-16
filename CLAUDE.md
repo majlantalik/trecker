@@ -58,7 +58,7 @@ writes gigabytes to `src-tauri/target/`.
 
 ### Tests
 
-166 Rust tests and 221 frontend tests. The Rust integration tests in
+177 Rust tests and 248 frontend tests. The Rust integration tests in
 `src-tauri/src/repo/integration.rs` run against a real temporary SQLite file through the
 real migration, so they catch actual SQL errors.
 
@@ -78,6 +78,17 @@ suites with coverage first: Vitest, then the Rust tests under `cargo-llvm-cov`. 
 Clippy itself from `sonar.rust.cargo.manifestPaths`. The repository's Automatic Analysis
 must stay off in SonarQube Cloud, or the two analyses conflict. `backend/` is excluded.
 
+## Workflow
+
+**`main` takes changes only through pull requests.** A GitHub ruleset blocks direct pushes,
+force pushes and deletion, and requires the `Test and analyze` job and the SonarQube Cloud
+quality gate to pass. It has no bypass, so there is no quick fix straight to `main` either.
+
+- Branch from an up-to-date `main`, one change per branch, then `gh pr create`.
+- Merged branches are deleted on GitHub automatically; delete the local one and pull `main`.
+- Zero approvals are required: GitHub never lets an author approve their own pull request,
+  so requiring one would lock `main`.
+
 ## Architecture
 
 ```
@@ -85,7 +96,7 @@ frontend/     Vue 3 + Vite + PrimeVue. Unchanged from the web app except src/api
 src-tauri/    The Rust core.
   migrations/ sqlx migrations, replacing Liquibase
   src/
-    commands.rs   the #[tauri::command] surface, 35 commands
+    commands.rs   the #[tauri::command] surface, 36 commands
     covers.rs     the on-disk cover cache and the cover: protocol
     desktop.rs    --quick-add, the tray, and what closing the window does
     settings.rs   this computer's preferences, as a JSON file
@@ -161,8 +172,20 @@ The rules that follow:
   back to a pressing's country.
 - **`rank_release_groups` only reorders hits tied on score.** Never filter by type, or EPs
   and singles become unfindable.
-- **Refresh looks the stored group id up directly.** Only a release with no id is refreshed
-  by searching its artist and title.
+- **Refresh looks the stored group id up directly, and never searches.** A release with no
+  id, typed in or imported, fails with `NOT_LINKED`; the album page then searches its artist
+  and title and opens `AlbumPicker` even for one match, and `releases_link` stores the
+  chosen id with its metadata. A search that picks for you lands on a different record often
+  enough to overwrite the right one. Linking to an album another tracked release already
+  has is refused with `ALREADY_IN_LIBRARY` and that release's id, never merged.
+- **Linking merges genres, it never replaces them.** `merge_genres` keeps the release's own
+  genres and adds MusicBrainz's that are missing, ignoring case. Hand-tagged genres from an
+  import are worth more than MusicBrainz's broader tags.
+- **Bulk matching links only an exact match on its own.** The Info view's "Match to
+  MusicBrainz" runs `stores/albumMatch.ts` over `releases_unlinked`: artist, title and year
+  must equal exactly one candidate after `normalizeForMatch` in `utils/albumMatch.ts`.
+  Everything else waits for a person in the same `AlbumPicker`. Do not loosen this to the
+  top-ranked hit. "None of these" is not stored; the next run asks again.
 - **"Release group" never reaches the interface.** The UI says album and the export field
   stays `musicbrainzId`. Code, schema and developer docs use the precise term.
 

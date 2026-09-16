@@ -36,6 +36,16 @@ pub struct Release {
     pub genres: Vec<String>,
 }
 
+/// A tracked album with no MusicBrainz id, as much of it as a search for it needs.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnlinkedRelease {
+    pub id: String,
+    pub artist: String,
+    pub title: String,
+    pub release_year: Option<i32>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReleaseRequest {
@@ -163,6 +173,15 @@ pub struct BreakdownItem {
 pub struct YearEndEntry {
     pub rank: u32,
     pub release: Release,
+}
+
+/// Which year a year-end list groups by: when you listened, or when the album came out.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum YearEndBasis {
+    #[default]
+    Listened,
+    Released,
 }
 
 // ---------------------------------------------------------------- artists

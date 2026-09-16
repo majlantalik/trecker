@@ -2,6 +2,20 @@
   <div class="chart-card">
     <div class="ye-header">
       <h3>Year End List</h3>
+      <fieldset class="basis-toggle">
+        <legend class="visually-hidden">Rank albums by the year they were</legend>
+        <button
+          v-for="option in BASES"
+          :key="option.value"
+          type="button"
+          class="basis-btn"
+          :class="{ active: by === option.value }"
+          :aria-pressed="by === option.value"
+          @click="by !== option.value && $emit('by-change', option.value)"
+        >
+          {{ option.label }}
+        </button>
+      </fieldset>
       <div class="year-selector">
         <Button icon="pi pi-chevron-left" text size="small" @click="$emit('year-change', year - 1)" />
         <span class="year-label">{{ year }}</span>
@@ -23,7 +37,9 @@
         </div>
       </div>
     </div>
-    <div v-else class="empty-state">No entries for {{ year }}.</div>
+    <div v-else class="empty-state">
+      No rated albums {{ by === 'released' ? 'released' : 'listened to' }} in {{ year }}.
+    </div>
   </div>
 </template>
 
@@ -32,16 +48,23 @@ import { coverSrc } from '@/api/cache'
 import { RouterLink } from 'vue-router'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import Button from 'primevue/button'
-import type { YearEndEntry } from '@/types'
+import type { YearEndBasis, YearEndEntry } from '@/types'
 
 defineProps<{
   year: number
+  by: YearEndBasis
   entries: YearEndEntry[]
 }>()
 
 defineEmits<{
   'year-change': [year: number]
+  'by-change': [by: YearEndBasis]
 }>()
+
+const BASES: { label: string; value: YearEndBasis }[] = [
+  { label: 'Listened', value: 'listened' },
+  { label: 'Released', value: 'released' }
+]
 
 const currentYear = new Date().getFullYear()
 </script>
@@ -65,6 +88,51 @@ const currentYear = new Date().getFullYear()
   margin: 0;
   font-size: 1rem;
   color: var(--p-text-muted-color);
+}
+
+.basis-toggle {
+  display: flex;
+  margin: 0 auto 0 1rem;
+  padding: 2px;
+  border: 1px solid var(--p-surface-700);
+  border-radius: 6px;
+  min-inline-size: 0;
+}
+
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.basis-btn {
+  padding: 0.2rem 0.7rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--p-text-muted-color);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.basis-btn:hover {
+  color: var(--p-text-color);
+}
+
+.basis-btn:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 1px;
+}
+
+.basis-btn.active {
+  background: var(--p-surface-800);
+  color: var(--p-primary-color);
+  font-weight: 600;
 }
 
 .year-selector {

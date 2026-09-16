@@ -397,11 +397,6 @@ async fn stats_aggregate_only_listened_releases() {
     let countries = stats::by_country(&pool).await.unwrap();
     assert_eq!(countries.len(), 3);
     assert!(countries.iter().all(|c| c.count == 1));
-
-    let top = stats::top_rated(&pool, 25).await.unwrap();
-    assert_eq!(top.len(), 3, "the queued release is excluded");
-    assert_eq!(top[0].rating, Some(5.0));
-    assert_eq!(top[2].rating, Some(4.0));
 }
 
 #[tokio::test]
@@ -411,17 +406,57 @@ async fn year_end_respects_the_year_boundary() {
     add_listened(&pool, "Early", "Jan 1st", 5.0, "2026-01-01T00:00:00Z", None, &[]).await;
     add_listened(&pool, "Mid", "Jun", 3.0, "2026-06-15T12:00:00Z", None, &[]).await;
 
-    let y2026 = stats::year_end(&pool, 2026).await.unwrap();
+    let y2026 = stats::year_end(&pool, 2026, YearEndBasis::Listened).await.unwrap();
     assert_eq!(y2026.len(), 2, "the December entry belongs to 2025");
     assert_eq!(y2026[0].rank, 1);
     assert_eq!(y2026[0].release.artist, "Early", "ranked by rating");
     assert_eq!(y2026[1].rank, 2);
 
-    let y2025 = stats::year_end(&pool, 2025).await.unwrap();
+    let y2025 = stats::year_end(&pool, 2025, YearEndBasis::Listened).await.unwrap();
     assert_eq!(y2025.len(), 1);
     assert_eq!(y2025[0].release.artist, "Late");
 
-    assert!(stats::year_end(&pool, 2024).await.unwrap().is_empty());
+    assert!(stats::year_end(&pool, 2024, YearEndBasis::Listened).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn year_end_by_release_year_ignores_when_it_was_heard() {
+    let (_d, pool) = fresh().await;
+    let old = add_listened(&pool, "Slint", "Spiderland", 5.0, "2026-03-01T10:00:00Z", None, &[]).await;
+    let new = add_listened(&pool, "Gaupa", "Myriad", 4.0, "2023-02-01T10:00:00Z", None, &[]).await;
+    add_listened(&pool, "Undated", "No Year", 5.0, "2022-06-01T10:00:00Z", None, &[]).await;
+    for (id, year) in [(&old, 1991), (&new, 2022)] {
+        sqlx::query("UPDATE releases SET release_year = ? WHERE id = ?")
+            .bind(year)
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    let released = stats::year_end(&pool, 2022, YearEndBasis::Released).await.unwrap();
+    assert_eq!(released.len(), 1, "an album with no release year is in no release-year list");
+    assert_eq!(released[0].release.title, "Myriad", "listened in 2023, released in 2022");
+
+    let listened = stats::year_end(&pool, 2022, YearEndBasis::Listened).await.unwrap();
+    assert_eq!(listened.len(), 1);
+    assert_eq!(listened[0].release.title, "No Year");
+
+    assert_eq!(stats::year_end(&pool, 1991, YearEndBasis::Released).await.unwrap()[0].rank, 1);
+}
+
+#[tokio::test]
+async fn year_end_ranks_at_most_twenty() {
+    let (_d, pool) = fresh().await;
+    for i in 0..25 {
+        let date = format!("2026-01-{:02}T10:00:00Z", i + 1);
+        add_listened(&pool, "Artist", &format!("Album {i}"), 4.0, &date, None, &[]).await;
+    }
+
+    let list = stats::year_end(&pool, 2026, YearEndBasis::Listened).await.unwrap();
+    assert_eq!(list.len(), 20);
+    assert_eq!(list[19].rank, 20);
+    assert_eq!(list[0].release.title, "Album 24", "ties on rating go to the latest listen");
 }
 
 #[tokio::test]
@@ -434,27 +469,26 @@ async fn unrated_releases_are_excluded_from_rankings() {
         ..Default::default()
     }).await.unwrap();
 
-    assert!(stats::top_rated(&pool, 25).await.unwrap().is_empty());
-    assert!(stats::year_end(&pool, 2026).await.unwrap().is_empty());
+    assert!(stats::year_end(&pool, 2026, YearEndBasis::Listened).await.unwrap().is_empty());
     // But it still counts as listening activity.
     assert_eq!(stats::activity(&pool).await.unwrap().len(), 1);
 }
 
-/// Refresh repairs a record whose metadata was captured before the resolver understood
-/// release groups: no artwork, and the country of whichever pressing the search matched.
-/// Hits the live services, so it is excluded from normal runs.
+/// An album with no id is linked to the one the person chose, which repairs its metadata
+/// and stores the id. Hits the live services, so it is excluded from normal runs.
 #[tokio::test]
 #[ignore = "makes real network requests"]
-async fn refresh_repairs_stale_metadata_without_touching_user_data() {
-    use crate::commands::refresh_metadata;
+async fn linking_repairs_metadata_without_touching_user_data() {
+    use crate::commands::{link_metadata, refresh_metadata};
     use crate::resolve::Resolver;
 
     let (_d, pool) = fresh().await;
+    let resolver = Resolver::new("0.1.0-test");
     let created = releases::create(&pool, req("Avenged Sevenfold", "City of Evil"))
         .await
         .unwrap();
 
-    // Put it in the state the real library was in, and add the user's own data alongside.
+    // Put it in the state an imported library is in, with the user's own data alongside.
     releases::update(
         &pool,
         &created.id,
@@ -470,22 +504,29 @@ async fn refresh_repairs_stale_metadata_without_touching_user_data() {
     .await
     .unwrap();
 
-    let refreshed = refresh_metadata(&pool, &Resolver::new("0.1.0-test"), &created.id)
+    let linked = link_metadata(&pool, &resolver, &created.id, "180560ee-2d9d-33cf-8de7-cdaaba610739")
         .await
         .unwrap();
 
     // Catalog fields repaired.
-    assert_eq!(refreshed.country.as_deref(), Some("US"), "the band, not the pressing");
-    assert!(refreshed.album_art_url.is_some(), "artwork from the release group");
-    assert!(refreshed.album_art_url.unwrap().starts_with("https://"));
-    assert!(!refreshed.genres.is_empty());
-    assert_eq!(refreshed.release_year, Some(2005));
+    assert_eq!(linked.country.as_deref(), Some("US"), "the band, not the pressing");
+    assert!(linked.album_art_url.is_some(), "artwork from the release group");
+    assert!(linked.album_art_url.unwrap().starts_with("https://"));
+    assert!(!linked.genres.is_empty());
+    assert_eq!(linked.release_year, Some(2005));
+    assert_eq!(
+        releases::release_group_id(&pool, &created.id).await.unwrap().as_deref(),
+        Some("180560ee-2d9d-33cf-8de7-cdaaba610739")
+    );
 
     // Everything that is the user's is untouched.
-    assert_eq!(refreshed.status, ReleaseStatus::Listened);
-    assert_eq!(refreshed.rating, Some(4.5));
-    assert_eq!(refreshed.notes.as_deref(), Some("loud"));
-    assert_eq!(refreshed.date_listened.as_deref(), Some("2026-02-01T12:00:00Z"));
+    assert_eq!(linked.status, ReleaseStatus::Listened);
+    assert_eq!(linked.rating, Some(4.5));
+    assert_eq!(linked.notes.as_deref(), Some("loud"));
+    assert_eq!(linked.date_listened.as_deref(), Some("2026-02-01T12:00:00Z"));
+
+    // And from now on a plain refresh works, by id.
+    assert_eq!(refresh_metadata(&pool, &resolver, &created.id).await.unwrap().title, "City of Evil");
 }
 
 /// A release with a group id is refreshed by lookup, not by searching its current text.
@@ -533,6 +574,125 @@ async fn refresh_of_a_missing_release_is_not_found() {
     assert!(refresh_metadata(&pool, &Resolver::new("0.1.0-test"), "nope")
         .await
         .is_err());
+}
+
+#[tokio::test]
+async fn refresh_without_an_id_asks_for_a_choice_instead_of_searching() {
+    use crate::commands::refresh_metadata;
+    use crate::error::AppError;
+    use crate::resolve::Resolver;
+
+    let (_d, pool) = fresh().await;
+    let created = releases::create(&pool, req("KEN Mode", "NULL")).await.unwrap();
+    // No network is reached: the missing id is found before the resolver is consulted.
+    let err = refresh_metadata(&pool, &Resolver::new("0.1.0-test"), &created.id).await.unwrap_err();
+    assert!(matches!(err, AppError::NotLinked), "{err:?}");
+    assert_eq!(releases::get(&pool, &created.id).await.unwrap().title, "NULL", "nothing written");
+}
+
+#[tokio::test]
+async fn link_checks_the_id_and_the_release_before_any_request() {
+    use crate::commands::link_metadata;
+    use crate::error::AppError;
+    use crate::resolve::Resolver;
+
+    let (_d, pool) = fresh().await;
+    let resolver = Resolver::new("0.1.0-test");
+    let created = releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
+
+    let bad = link_metadata(&pool, &resolver, &created.id, "../release/x").await.unwrap_err();
+    assert!(matches!(bad, AppError::Invalid(_)), "{bad:?}");
+
+    let missing = link_metadata(&pool, &resolver, "nope", "180560ee-2d9d-33cf-8de7-cdaaba610739")
+        .await
+        .unwrap_err();
+    assert!(matches!(missing, AppError::NotFound(_)), "{missing:?}");
+}
+
+#[tokio::test]
+async fn linking_stores_the_id() {
+    let (_d, pool) = fresh().await;
+    let created = releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
+    releases::link_release_group(&pool, &created.id, "group-1").await.unwrap();
+    assert_eq!(releases::release_group_id(&pool, &created.id).await.unwrap().as_deref(), Some("group-1"));
+
+    // Linking again to the same album is not a conflict with itself.
+    releases::link_release_group(&pool, &created.id, "group-1").await.unwrap();
+}
+
+#[tokio::test]
+async fn linking_to_an_album_you_already_track_names_it_and_changes_nothing() {
+    use crate::error::AppError;
+
+    let (_d, pool) = fresh().await;
+    let mut searched = req("Slint", "Spiderland");
+    searched.musicbrainz_release_group_id = Some("group-1".into());
+    let searched = releases::create(&pool, searched).await.unwrap();
+    let imported = releases::create(&pool, req("slint", "spiderland (remaster)")).await.unwrap();
+
+    let err = releases::link_release_group(&pool, &imported.id, "group-1").await.unwrap_err();
+    match err {
+        AppError::AlreadyInLibrary { release_id, artist, title } => {
+            assert_eq!(release_id, searched.id);
+            assert_eq!((artist.as_str(), title.as_str()), ("Slint", "Spiderland"));
+        }
+        other => panic!("expected AlreadyInLibrary, got {other:?}"),
+    }
+    assert_eq!(releases::release_group_id(&pool, &imported.id).await.unwrap(), None);
+    assert_eq!(releases::release_group_id(&pool, &searched.id).await.unwrap().as_deref(), Some("group-1"));
+}
+
+#[tokio::test]
+async fn linking_takes_the_id_from_a_release_you_deleted() {
+    let (_d, pool) = fresh().await;
+    let mut old = req("Slint", "Spiderland");
+    old.musicbrainz_release_group_id = Some("group-1".into());
+    let old = releases::create(&pool, old).await.unwrap();
+    releases::delete(&pool, &old.id).await.unwrap();
+    let imported = releases::create(&pool, req("Slint", "Spiderland (import)")).await.unwrap();
+
+    releases::link_release_group(&pool, &imported.id, "group-1").await.unwrap();
+    assert_eq!(releases::release_group_id(&pool, &imported.id).await.unwrap().as_deref(), Some("group-1"));
+    let holders: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM releases WHERE musicbrainz_release_group_id = 'group-1'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(holders, 1);
+}
+
+#[tokio::test]
+async fn unlinked_lists_tracked_albums_without_an_id_in_the_order_added() {
+    let (_d, pool) = fresh().await;
+    let mut linked = req("Slint", "Spiderland");
+    linked.musicbrainz_release_group_id = Some("group-1".into());
+    releases::create(&pool, linked).await.unwrap();
+    let first = releases::create(&pool, req("Hexis", "Aeternum")).await.unwrap();
+    let mut second = req("Gaupa", "Myriad");
+    second.release_year = Some(2022);
+    let second = releases::create(&pool, second).await.unwrap();
+    let deleted = releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
+    releases::delete(&pool, &deleted.id).await.unwrap();
+
+    let list = releases::unlinked(&pool).await.unwrap();
+    let ids: Vec<_> = list.iter().map(|r| r.id.as_str()).collect();
+    assert_eq!(ids, [first.id.as_str(), second.id.as_str()], "no linked, no untracked");
+    assert_eq!(list[1].release_year, Some(2022));
+
+    releases::link_release_group(&pool, &first.id, "group-2").await.unwrap();
+    assert_eq!(releases::unlinked(&pool).await.unwrap().len(), 1);
+}
+
+#[test]
+fn genres_merge_keeping_yours_first_and_ignoring_case() {
+    use crate::commands::merge_genres;
+    let s = |v: &[&str]| v.iter().map(ToString::to_string).collect::<Vec<_>>();
+
+    assert_eq!(
+        merge_genres(&s(&["atmo black metal", "Sludge"]), &s(&["black metal", "sludge", "post-metal"])),
+        s(&["atmo black metal", "Sludge", "black metal", "post-metal"])
+    );
+    assert_eq!(merge_genres(&s(&["emo"]), &[]), s(&["emo"]), "nothing found removes nothing");
+    assert_eq!(merge_genres(&[], &s(&["emo", "Emo", " "])), s(&["emo"]));
 }
 
 #[tokio::test]

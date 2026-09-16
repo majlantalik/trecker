@@ -63,6 +63,14 @@ export interface ResolvedMetadata {
 }
 
 /** One possible match from a quick add search. Genres, country and cover come later. */
+/** A tracked album with no MusicBrainz id, as a bulk match searches for it. */
+export interface UnlinkedRelease {
+  id: string
+  artist: string
+  title: string
+  releaseYear: number | null
+}
+
 export interface AlbumCandidate {
   musicbrainzReleaseGroupId: string
   artist: string | null
@@ -109,6 +117,9 @@ export interface BreakdownItem {
   label: string
   count: number
 }
+
+/** Which year a year-end list groups by: when you listened, or when the album came out. */
+export type YearEndBasis = 'listened' | 'released'
 
 export interface YearEndEntry {
   rank: number

@@ -8,7 +8,7 @@ use crate::domain::{
     ActivityDataPoint, AlbumCandidate, Artist, ArtistAddRequest, ArtistCandidate,
     ArtistUpdateRequest, BreakdownItem, DiscographyEntry, PageResponse, Release,
     ReleaseFilterParams, ReleaseRequest, ReleaseUpdateRequest, ResolveRequest, ResolvedMetadata,
-    YearEndEntry,
+    UnlinkedRelease, YearEndBasis, YearEndEntry,
 };
 use crate::error::{AppError, AppResult};
 use crate::library;
@@ -96,27 +96,74 @@ pub async fn releases_refresh_metadata(
 }
 
 /// The body of `releases_refresh_metadata`, free of Tauri state so it can be tested.
+///
+/// Only an album with a MusicBrainz id is refreshed, by looking that id up. One without is
+/// refused with `NotLinked`: a search would pick an album on its own, and for a hand-entered
+/// or imported title the top hit is often a different record, which would then overwrite
+/// this one's artist, title and cover. The frontend searches instead, the person chooses,
+/// and `releases_link` stores the choice.
 pub async fn refresh_metadata(
     pool: &sqlx::SqlitePool,
     resolver: &Resolver,
     id: &str,
 ) -> AppResult<Release> {
-    let current = repo::releases::get(pool, id).await?;
+    let group = repo::releases::release_group_id(pool, id)
+        .await?
+        .ok_or(AppError::NotLinked)?;
+    let found = resolver.lookup(&group).await?;
+    apply_metadata(pool, id, found).await
+}
 
-    // By id when the album has one, which is every album added from a search. A second
-    // search could land on a different album entirely; a lookup cannot. Only a release
-    // typed in by hand has no id, and a search is the only way to find it anything.
-    let found = match repo::releases::release_group_id(pool, id).await? {
-        Some(group) => resolver.lookup(&group).await?,
-        None => {
-            resolver
-                .resolve(ResolveRequest {
-                    query: Some(format!("{} - {}", current.artist, current.title)),
-                    url: None,
-                })
-                .await?
-        }
-    };
+/// Links a release to the album the person chose from a search, then fills in its metadata
+/// the way refresh does. Every later refresh goes by that id.
+#[tauri::command]
+pub async fn releases_link(
+    db: State<'_, Db>,
+    resolver: State<'_, Resolver>,
+    id: String,
+    release_group_id: String,
+) -> AppResult<Release> {
+    link_metadata(&db.pool, &resolver, &id, &release_group_id).await
+}
+
+/// The body of `releases_link`, free of Tauri state so it can be tested.
+pub async fn link_metadata(
+    pool: &sqlx::SqlitePool,
+    resolver: &Resolver,
+    id: &str,
+    release_group_id: &str,
+) -> AppResult<Release> {
+    // It goes into a URL path.
+    let requested = release_group_id.trim();
+    if !crate::resolve::artists::is_mbid(requested) {
+        return Err(AppError::Invalid("not a MusicBrainz album id".into()));
+    }
+    // Not found before any request is made.
+    repo::releases::release_group_id(pool, id).await?;
+
+    let found = resolver.lookup(requested).await?;
+    // MusicBrainz answers a merged id with the album it was merged into; store that one.
+    let group = found
+        .musicbrainz_release_group_id
+        .clone()
+        .filter(|g| crate::resolve::artists::is_mbid(g))
+        .unwrap_or_else(|| requested.to_string());
+    if found.artist.is_none() && found.title.is_none() {
+        return Err(AppError::Resolve(format!("no album found for {requested}")));
+    }
+
+    repo::releases::link_release_group(pool, id, &group).await?;
+    apply_metadata(pool, id, found).await
+}
+
+/// Writes looked-up catalog fields over a release. Rating, notes, status, dates and links
+/// are the person's and are never touched.
+async fn apply_metadata(
+    pool: &sqlx::SqlitePool,
+    id: &str,
+    found: ResolvedMetadata,
+) -> AppResult<Release> {
+    let current = repo::releases::get(pool, id).await?;
 
     // A lookup that comes back with nothing recognisable must not wipe what is already
     // there. Refusing is better than overwriting a good record with an empty one.
@@ -127,6 +174,8 @@ pub async fn refresh_metadata(
         )));
     }
 
+    let genres = merge_genres(&current.genres, &found.genres);
+
     repo::releases::update(
         pool,
         id,
@@ -136,12 +185,34 @@ pub async fn refresh_metadata(
             release_year: found.release_year,
             album_art_url: found.album_art_url,
             country: found.country,
-            // Empty genres mean the providers had none, not that yours should go.
-            genres: (!found.genres.is_empty()).then_some(found.genres),
+            genres: (genres != current.genres).then_some(genres),
             ..Default::default()
         },
     )
     .await
+}
+
+/// Your genres, then MusicBrainz's that you do not already have, compared ignoring case.
+///
+/// Merged rather than replaced: genres are often tagged by hand, as in a library imported
+/// from notes, and MusicBrainz's broader tags would otherwise erase them. Yours keep their
+/// spelling and order; nothing is ever removed.
+pub fn merge_genres(mine: &[String], found: &[String]) -> Vec<String> {
+    let mut merged: Vec<String> = Vec::with_capacity(mine.len() + found.len());
+    for genre in mine.iter().chain(found) {
+        let genre = genre.trim();
+        if !genre.is_empty() && !merged.iter().any(|g| g.to_lowercase() == genre.to_lowercase()) {
+            merged.push(genre.to_string());
+        }
+    }
+    merged
+}
+
+/// Every tracked album with no MusicBrainz id, oldest addition first: what a bulk match
+/// works through.
+#[tauri::command]
+pub async fn releases_unlinked(db: State<'_, Db>) -> AppResult<Vec<UnlinkedRelease>> {
+    repo::releases::unlinked(&db.pool).await
 }
 
 #[tauri::command]
@@ -183,16 +254,15 @@ pub async fn stats_by_country(db: State<'_, Db>) -> AppResult<Vec<BreakdownItem>
 }
 
 #[tauri::command]
-pub async fn stats_top_rated(db: State<'_, Db>, limit: Option<u32>) -> AppResult<Vec<Release>> {
-    repo::stats::top_rated(&db.pool, limit.unwrap_or(25)).await
-}
-
-#[tauri::command]
-pub async fn stats_year_end(db: State<'_, Db>, year: Option<i32>) -> AppResult<Vec<YearEndEntry>> {
+pub async fn stats_year_end(
+    db: State<'_, Db>,
+    year: Option<i32>,
+    by: Option<YearEndBasis>,
+) -> AppResult<Vec<YearEndEntry>> {
     // The frontend sends no year on first load; "this year" is the sensible default and
     // deriving it here keeps the frontend from having to know.
     let year = year.unwrap_or_else(current_year);
-    repo::stats::year_end(&db.pool, year).await
+    repo::stats::year_end(&db.pool, year, by.unwrap_or_default()).await
 }
 
 // ---------------------------------------------------------------- info

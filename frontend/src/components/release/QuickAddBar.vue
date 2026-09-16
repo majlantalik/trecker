@@ -310,7 +310,7 @@ async function handleFormSubmit(data: any) {
 }
 
 .suggestion-year {
-  color: rgba(226, 228, 240, 0.45);
+  color: rgba(226, 228, 240, 0.6);
   font-size: 0.8rem;
 }
 </style>

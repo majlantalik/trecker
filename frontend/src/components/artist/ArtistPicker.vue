@@ -152,7 +152,7 @@ function onChange(event: { value: ArtistCandidate | null }) {
 
 .arp-tags {
   font-size: 0.74rem;
-  color: rgba(226, 228, 240, 0.45);
+  color: rgba(226, 228, 240, 0.6);
 }
 
 .arp-busy {
@@ -177,7 +177,7 @@ function onChange(event: { value: ArtistCandidate | null }) {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.72rem;
-  color: rgba(226, 228, 240, 0.4);
+  color: rgba(226, 228, 240, 0.6);
 }
 
 .arp-sep {

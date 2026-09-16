@@ -81,7 +81,7 @@ function byGroup(group: string) {
 
 .sch-then {
   font-size: 0.68rem;
-  color: rgba(226, 228, 240, 0.35);
+  color: rgba(226, 228, 240, 0.6);
 }
 
 kbd {
@@ -102,7 +102,7 @@ kbd {
   padding-top: 1rem;
   border-top: 1px solid var(--tk-border);
   font-size: 0.75rem;
-  color: rgba(226, 228, 240, 0.45);
+  color: rgba(226, 228, 240, 0.6);
 }
 </style>
 
