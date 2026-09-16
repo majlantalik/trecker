@@ -425,11 +425,13 @@ pub async fn link_release_group(pool: &SqlitePool, release_id: &str, group_id: &
 
 /// Tracked releases with no MusicBrainz id, in the order they were added.
 pub async fn unlinked(pool: &SqlitePool) -> AppResult<Vec<UnlinkedRelease>> {
+    // created_at has whole seconds, and an import writes many rows within one, so rowid
+    // breaks the tie in insertion order. The random UUID in ur.id would shuffle them.
     let rows: Vec<(String, String, String, Option<i32>)> = sqlx::query_as(
         "SELECT r.id, r.artist, r.title, r.release_year FROM user_releases ur \
          JOIN releases r ON r.id = ur.release_id \
          WHERE ur.user_id = ? AND r.musicbrainz_release_group_id IS NULL \
-         ORDER BY ur.created_at, ur.id",
+         ORDER BY ur.created_at, ur.rowid",
     )
     .bind(LOCAL_USER_ID)
     .fetch_all(pool)
