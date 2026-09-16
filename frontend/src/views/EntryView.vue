@@ -651,7 +651,7 @@ function capitalize(s: string) {
   letter-spacing: 0.05em;
   border: 1px solid var(--tk-border);
   background: transparent;
-  color: rgba(226, 228, 240, 0.4);
+  color: rgba(226, 228, 240, 0.6);
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -745,7 +745,7 @@ function capitalize(s: string) {
   padding: 0.3rem 0.5rem;
   border: none;
   background: transparent;
-  color: rgba(226, 228, 240, 0.35);
+  color: rgba(226, 228, 240, 0.6);
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
   border-left: 1px solid var(--tk-border);

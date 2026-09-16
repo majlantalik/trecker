@@ -148,8 +148,9 @@ function formatAdded(iso: string) {
   letter-spacing: -0.01em;
 }
 
+/* 7.4:1 on the card, a step above the muted text below it. */
 .card-artist {
-  color: var(--tk-text-muted);
+  color: rgba(226, 228, 240, 0.7);
   font-size: 0.9rem;
   margin-top: 0.2rem;
 }
@@ -159,8 +160,8 @@ function formatAdded(iso: string) {
   gap: 0.5rem;
   margin-top: 0.3rem;
   font-size: 0.78rem;
-  color: var(--tk-text-muted);
-  opacity: 0.7;
+  /* 5.0:1, still a step below the artist. Colour rather than opacity, so the flag stays true. */
+  color: rgba(226, 228, 240, 0.55);
 }
 
 /* Above the stretched button, so its tooltip still shows. */

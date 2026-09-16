@@ -169,7 +169,6 @@ onMounted(() => {
   color: var(--tk-text-muted);
   padding: 0 1.5rem;
   margin-bottom: 0.5rem;
-  opacity: 0.6;
 }
 
 .sidebar-nav {
@@ -371,7 +370,7 @@ onMounted(() => {
 
 .user-email {
   font-size: 0.72rem;
-  color: rgba(226, 228, 240, 0.45);
+  color: rgba(226, 228, 240, 0.6);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

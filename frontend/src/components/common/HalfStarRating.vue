@@ -125,7 +125,7 @@ function onKeydown(event: KeyboardEvent) {
 .hsr-cancel {
   background: none; border: none; padding: 0; margin-right: 4px; cursor: pointer;
   color: var(--p-rating-icon-color, var(--tk-text-muted)); font-size: 1rem;
-  opacity: 0.4; transition: opacity 0.15s, color 0.15s; display: inline-flex;
+  opacity: 0.7; transition: opacity 0.15s, color 0.15s; display: inline-flex;
 }
 .hsr-cancel:hover, .hsr-cancel-active { opacity: 1; color: var(--p-rating-icon-active-color, var(--tk-accent)); }
 
@@ -138,7 +138,7 @@ function onKeydown(event: KeyboardEvent) {
 .hsr-left { left: 0; }
 .hsr-right { right: 0; }
 
-.hsr-bg { position: absolute; font-size: 1.25rem; color: var(--p-rating-icon-color, var(--tk-text-muted)); opacity: 0.35; pointer-events: none; z-index: 0; }
+.hsr-bg { position: absolute; font-size: 1.25rem; color: var(--p-rating-icon-color, var(--tk-text-muted)); opacity: 0.7; pointer-events: none; z-index: 0; }
 .hsr-fg { position: absolute; font-size: 1.25rem; color: var(--p-rating-icon-active-color, var(--tk-accent)); pointer-events: none; z-index: 1; transition: clip-path 0.1s, opacity 0.1s; }
 
 .hsr-readonly .hsr-half { cursor: default; pointer-events: none; }

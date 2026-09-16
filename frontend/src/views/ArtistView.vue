@@ -671,7 +671,7 @@ function formatDate(iso: string | null) {
 
 .album-meta {
   font-size: 0.78rem;
-  color: rgba(226, 228, 240, 0.5);
+  color: rgba(226, 228, 240, 0.6);
 }
 
 .library-badge {

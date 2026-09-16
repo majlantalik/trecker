@@ -379,7 +379,7 @@ onMounted(async () => {
 
 .provider-note {
   font-size: 0.75rem;
-  color: rgba(226, 228, 240, 0.45);
+  color: rgba(226, 228, 240, 0.6);
   margin-left: 0.5rem;
 }
 
@@ -392,7 +392,7 @@ onMounted(async () => {
 
 .form-hint {
   font-size: 0.75rem;
-  color: rgba(226, 228, 240, 0.45);
+  color: rgba(226, 228, 240, 0.6);
   margin: 0.25rem 0 0;
 }
 

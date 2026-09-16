@@ -49,7 +49,7 @@ async function onShow() {
   gap: 0.5rem;
   margin-top: 0.85rem;
   font-size: 0.72rem;
-  color: rgba(226, 228, 240, 0.4);
+  color: rgba(226, 228, 240, 0.6);
 }
 
 .qap-sep {

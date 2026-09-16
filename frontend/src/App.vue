@@ -21,7 +21,8 @@ import AppLayout from '@/components/layout/AppLayout.vue'
   --tk-border: rgba(255, 255, 255, 0.07);
   --tk-border-hover: rgba(255, 255, 255, 0.14);
   --tk-text: #e2e4f0;
-  --tk-text-muted: #5a6080;
+  /* Secondary text and icons: 5.7:1 on --tk-surface, 5.2:1 on --tk-surface-hover. */
+  --tk-text-muted: #8a90b0;
   --tk-accent: #00e5b0;
   --tk-accent-hover: #00ffc8;
   --tk-accent-dim: rgba(0, 229, 176, 0.12);
@@ -190,8 +191,7 @@ textarea {
   }
 }
 
-/* A form field's label, in the uppercase style of the library filters' labels. Brighter
-   than theirs, which use --tk-text-muted and are too faint to read on a dialog panel. */
+/* A form field's label, in the uppercase style of the library filters' labels. */
 .tk-label {
   font-size: 0.72rem;
   font-weight: 600;
