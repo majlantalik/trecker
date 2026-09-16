@@ -43,7 +43,7 @@
         <template v-else-if="db">
           <p class="stat-row">
             <span class="stat-label">Location</span>
-            <span class="stat-value stat-path" :title="db.path">{{ db.path }}</span>
+            <span class="stat-value stat-path" :title="db.path"><bdi dir="ltr">{{ db.path }}</bdi></span>
           </p>
           <p class="stat-row">
             <span class="stat-label">Size on disk</span>
@@ -480,3 +480,5 @@ onMounted(async () => {
   margin: 0;
 }
 </style>
+  /* Right to left so a long path loses its start, not its file name. The <bdi> inside keeps
+     the path itself left to right, or its leading slash is drawn at the end. */

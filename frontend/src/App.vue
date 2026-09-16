@@ -41,9 +41,15 @@ html, body {
   background: var(--tk-bg);
 }
 
+/* The base size lives on html, not body: every size in the app and in PrimeVue's theme is in
+   rem, which is relative to the root element and ignores body. */
+html {
+  font-size: 18px;
+}
+
 body {
   font-family: var(--tk-font-body);
-  font-size: 18px;
+  font-size: 1rem;
   color: var(--tk-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
