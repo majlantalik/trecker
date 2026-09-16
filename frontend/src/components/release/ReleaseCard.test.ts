@@ -20,17 +20,17 @@ function mountCard() {
 }
 
 describe('opening a release card', () => {
-  it('opens on a click and on Enter', async () => {
+  it('opens from its title button, which covers the card and names the release', async () => {
     const w = mountCard()
-    await w.find('.release-card').trigger('click')
-    await w.find('.release-card').trigger('keydown', { key: 'Enter' })
-    expect(w.emitted('click')).toEqual([[release], [release]])
+    const open = w.find('button.card-open')
+    expect(open.attributes('aria-label')).toBe('Open Sigur Rós – Ágætis byrjun')
+    await open.trigger('click')
+    expect(w.emitted('click')).toEqual([[release]])
   })
 
   it('does not open from its own action buttons', async () => {
     const w = mountCard()
     await w.find('.action').trigger('click')
-    await w.find('.action').trigger('keydown', { key: 'Enter' })
     expect(w.emitted('click')).toBeUndefined()
   })
 })

@@ -1,7 +1,5 @@
 <template>
-  <!-- Focusable and opened with Enter, so the queue and library grid work from the keyboard.
-       No button role: the card holds its own action buttons, which a button cannot contain. -->
-  <div class="release-card" tabindex="0" @click="open" @keydown.enter.self="open">
+  <div class="release-card">
     <div class="card-art">
       <img v-if="release.albumArtUrl" :src="coverSrc(release.albumArtUrl)" :alt="`${release.artist} - ${release.title}`" />
       <div v-else class="art-placeholder">
@@ -9,7 +7,17 @@
       </div>
     </div>
     <div class="card-info">
-      <div class="card-title">{{ release.title }}</div>
+      <!-- The title is the card's button. It stretches over the whole card, so a click anywhere
+           opens the release, and the card cannot itself be a button because it holds the
+           action buttons, which sit above the stretched area. -->
+      <button
+        type="button"
+        class="card-title card-open"
+        :aria-label="`Open ${release.artist} – ${release.title}`"
+        @click="emit('click', release)"
+      >
+        {{ release.title }}
+      </button>
       <div class="card-artist">{{ release.artist }}</div>
       <div class="card-meta">
         <span v-if="release.releaseYear" class="meta-item">{{ release.releaseYear }}</span>
@@ -38,18 +46,12 @@ import CountryLabel from '@/components/common/CountryLabel.vue'
 import Tag from 'primevue/tag'
 import type { Release } from '@/types'
 
-const props = defineProps<{
+defineProps<{
   release: Release
   /** Shows when the album was added, for lists ordered by it. */
   showAdded?: boolean
 }>()
 const emit = defineEmits<{ click: [release: Release] }>()
-
-/** Opens the release, unless the click belongs to one of the card's actions. */
-function open(event: Event) {
-  if ((event.target as HTMLElement).closest('.card-actions')) return
-  emit('click', props.release)
-}
 
 function formatAdded(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -64,11 +66,12 @@ function formatAdded(iso: string) {
   border: 1px solid var(--tk-border);
   border-radius: 14px;
   background: var(--tk-surface);
+  position: relative;
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 
-.release-card:focus-visible {
+.release-card:has(.card-open:focus-visible) {
   outline: 2px solid var(--tk-accent);
   outline-offset: 2px;
 }
@@ -114,6 +117,26 @@ function formatAdded(iso: string) {
   justify-content: center;
 }
 
+.card-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-open:focus-visible {
+  outline: none;
+}
+
+.card-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
 .card-title {
   font-family: var(--tk-font-display);
   font-weight: 600;
@@ -140,7 +163,10 @@ function formatAdded(iso: string) {
   opacity: 0.7;
 }
 
+/* Above the stretched button, so its tooltip still shows. */
 .meta-added {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -162,6 +188,8 @@ function formatAdded(iso: string) {
 }
 
 .card-actions {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
