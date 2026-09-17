@@ -10,6 +10,14 @@
           @click="showLogModal = true"
         />
         <Button
+          icon="pi pi-copy"
+          severity="secondary"
+          text
+          v-tooltip.bottom="'Copy “Artist - Album”'"
+          aria-label="Copy artist and album"
+          @click="copyAlbum(release)"
+        />
+        <Button
           icon="pi pi-refresh"
           severity="secondary"
           text
@@ -263,6 +271,7 @@ import CountrySelect from '@/components/common/CountrySelect.vue'
 import QuickLogModal from '@/components/release/QuickLogModal.vue'
 import AlbumPicker from '@/components/release/AlbumPicker.vue'
 import { useAlbumLink } from '@/composables/useAlbumLink'
+import { useCopyAlbum } from '@/composables/useCopyAlbum'
 import GenreTagInput from '@/components/release/GenreTagInput.vue'
 import { releasesApi } from '@/api/releases'
 import { useReleasesStore } from '@/stores/releases'
@@ -290,6 +299,7 @@ const datePopoverRef = ref<InstanceType<typeof Popover> | null>(null)
 const dateDraft = ref<Date | null>(null)
 const refreshing = ref(false)
 const albumLink = useAlbumLink()
+const { copyAlbum } = useCopyAlbum()
 
 // Auto-focus directive for inline edit inputs
 const vFocus = {

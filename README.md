@@ -103,6 +103,10 @@ Everything you have listened to, as a table or a grid. Filter by free-text searc
 genre, country, year, rating range and the did-not-finish flag. Countries show as flags
 and names, and the country filter offers only the ones you actually have.
 
+The copy button on a table row, and the one on an album's own page, put the album on the
+clipboard as `Artist - Album`, for a search box, a message or a note. Pasted back into
+quick add, the same line searches the artist and the title separately.
+
 ### Artists
 
 A backlog of artists to check out, separate from the queue: someone a friend mentioned, a

@@ -62,9 +62,19 @@
               <span class="date-cell">{{ data.dateListened ? formatDate(data.dateListened) : '' }}</span>
             </template>
           </Column>
-          <Column style="width: 80px">
+          <Column style="width: 116px">
             <template #body="{ data }">
               <div class="table-actions">
+                <!-- `.stop`, or the row's own click handler runs on top of the copy. -->
+                <Button
+                  icon="pi pi-copy"
+                  text
+                  severity="secondary"
+                  size="small"
+                  v-tooltip.left="'Copy “Artist - Album”'"
+                  aria-label="Copy artist and album"
+                  @click.stop="copyAlbum(data)"
+                />
                 <Button
                   icon="pi pi-pencil"
                   text
@@ -130,6 +140,7 @@ import Paginator from 'primevue/paginator'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { useReleasesStore } from '@/stores/releases'
+import { useCopyAlbum } from '@/composables/useCopyAlbum'
 import ViewToggle from '@/components/library/ViewToggle.vue'
 import LibraryFilters from '@/components/library/LibraryFilters.vue'
 import ReleaseCard from '@/components/release/ReleaseCard.vue'
@@ -141,6 +152,7 @@ const route = useRoute()
 const confirm = useConfirm()
 const toast = useToast()
 const releasesStore = useReleasesStore()
+const { copyAlbum } = useCopyAlbum()
 
 const releases = computed(() => releasesStore.releases)
 const total = computed(() => releasesStore.total)
