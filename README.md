@@ -48,6 +48,9 @@ next to the title reverses that to oldest first, so you can work through the que
 order albums arrived. Trecker remembers the choice, which is also in **Settings**.
 
 - **Log** opens the Quick Log modal.
+- **Copy** puts the album on the clipboard as `Artist - Album`, for a search box, a message
+  or a note. Pasted back into quick add, that line searches the artist and the title
+  separately.
 - **Pick one for me** chooses a queued release at random.
 - The title opens the full Entry page.
 
@@ -102,6 +105,8 @@ album a few minutes later to link it.
 Everything you have listened to, as a table or a grid. Filter by free-text search, status,
 genre, country, year, rating range and the did-not-finish flag. Countries show as flags
 and names, and the country filter offers only the ones you actually have.
+
+Each table row has the same copy button as a queue row, and so does an album's own page.
 
 ### Artists
 
