@@ -136,6 +136,10 @@ pub struct ReleaseFilterParams {
     pub rating_max: Option<f64>,
     pub year: Option<i32>,
     pub did_not_finish: Option<bool>,
+    /// `true` keeps only releases with no MusicBrainz release group id, `false` only linked ones.
+    pub unlinked: Option<bool>,
+    /// `true` keeps only releases with no album art URL, `false` only those with one.
+    pub without_cover: Option<bool>,
     pub search: Option<String>,
     pub page: Option<u32>,
     pub size: Option<u32>,

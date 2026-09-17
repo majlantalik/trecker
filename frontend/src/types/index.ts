@@ -101,6 +101,10 @@ export interface ReleaseFilterParams {
   ratingMax?: number
   year?: number
   didNotFinish?: boolean
+  /** Only albums with no MusicBrainz id. */
+  unlinked?: boolean
+  /** Only albums with no cover URL. */
+  withoutCover?: boolean
   search?: string
   page?: number
   size?: number

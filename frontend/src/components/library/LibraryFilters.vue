@@ -128,6 +128,20 @@
             DNF only
           </label>
         </div>
+
+        <div class="filter-item">
+          <label class="filter-label inline-label" for="filter-unlinked">
+            <Checkbox v-model="localFilters.unlinked" binary input-id="filter-unlinked" @change="emit" />
+            Not linked to MusicBrainz
+          </label>
+        </div>
+
+        <div class="filter-item">
+          <label class="filter-label inline-label" for="filter-without-cover">
+            <Checkbox v-model="localFilters.withoutCover" binary input-id="filter-without-cover" @change="emit" />
+            Without cover
+          </label>
+        </div>
       </div>
     </div>
 
@@ -178,7 +192,9 @@ const localFilters = ref<ReleaseFilterParams>({
   country: '',
   year: undefined,
   ratingMin: undefined,
-  didNotFinish: undefined
+  didNotFinish: undefined,
+  unlinked: undefined,
+  withoutCover: undefined
 })
 
 let debounceTimer: ReturnType<typeof setTimeout>
@@ -218,6 +234,8 @@ function emit() {
     year: localFilters.value.year || undefined,
     ratingMin: localFilters.value.ratingMin || undefined,
     didNotFinish: localFilters.value.didNotFinish || undefined,
+    unlinked: localFilters.value.unlinked || undefined,
+    withoutCover: localFilters.value.withoutCover || undefined,
   })
 }
 
@@ -230,7 +248,9 @@ function clearFilters() {
     country: '',
     year: undefined,
     ratingMin: undefined,
-    didNotFinish: undefined
+    didNotFinish: undefined,
+    unlinked: undefined,
+    withoutCover: undefined
   }
   emit()
 }

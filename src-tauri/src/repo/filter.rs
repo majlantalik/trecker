@@ -51,6 +51,22 @@ pub fn push_filters(qb: &mut QueryBuilder<'_, Sqlite>, p: &ReleaseFilterParams) 
     if let Some(dnf) = p.did_not_finish {
         qb.push(" AND ur.did_not_finish = ").push_bind(i32::from(dnf));
     }
+    if let Some(unlinked) = p.unlinked {
+        qb.push(if unlinked {
+            " AND r.musicbrainz_release_group_id IS NULL"
+        } else {
+            " AND r.musicbrainz_release_group_id IS NOT NULL"
+        });
+    }
+    // Create, update and import store the URL as given, so an empty string means no cover
+    // just as NULL does.
+    if let Some(without) = p.without_cover {
+        qb.push(if without {
+            " AND COALESCE(TRIM(r.album_art_url), '') = ''"
+        } else {
+            " AND COALESCE(TRIM(r.album_art_url), '') <> ''"
+        });
+    }
     if let Some(c) = non_blank(&p.country) {
         qb.push(" AND LOWER(r.country) = ").push_bind(c.to_lowercase());
     }

@@ -258,6 +258,63 @@ async fn filters_narrow_the_result_set() {
 }
 
 #[tokio::test]
+async fn filters_by_musicbrainz_link() {
+    let (_d, pool) = fresh().await;
+    let mut linked = req("Slint", "Spiderland");
+    linked.musicbrainz_release_group_id = Some("0b2ea9a3-3ab6-3b0b-a2f5-e7c3d5d9d2b5".into());
+    releases::create(&pool, linked).await.unwrap();
+    releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
+
+    let list = |unlinked| {
+        let pool = pool.clone();
+        async move {
+            releases::list(&pool, &ReleaseFilterParams { unlinked, ..Default::default() })
+                .await
+                .unwrap()
+                .content
+                .into_iter()
+                .map(|r| r.title)
+                .collect::<Vec<_>>()
+        }
+    };
+
+    assert_eq!(list(Some(true)).await, vec!["Stratosphere"]);
+    assert_eq!(list(Some(false)).await, vec!["Spiderland"]);
+    assert_eq!(list(None).await.len(), 2);
+}
+
+#[tokio::test]
+async fn filters_by_cover() {
+    let (_d, pool) = fresh().await;
+    let mut with = req("Slint", "Spiderland");
+    with.album_art_url = Some("https://coverartarchive.org/release-group/x/front-250".into());
+    releases::create(&pool, with).await.unwrap();
+    releases::create(&pool, req("Duster", "Stratosphere")).await.unwrap();
+    let mut blank = req("Codeine", "Frigid Stars");
+    blank.album_art_url = Some("  ".into());
+    releases::create(&pool, blank).await.unwrap();
+
+    let list = |without_cover| {
+        let pool = pool.clone();
+        async move {
+            let mut titles = releases::list(&pool, &ReleaseFilterParams { without_cover, ..Default::default() })
+                .await
+                .unwrap()
+                .content
+                .into_iter()
+                .map(|r| r.title)
+                .collect::<Vec<_>>();
+            titles.sort();
+            titles
+        }
+    };
+
+    assert_eq!(list(Some(true)).await, vec!["Frigid Stars", "Stratosphere"], "a blank URL is no cover");
+    assert_eq!(list(Some(false)).await, vec!["Spiderland"]);
+    assert_eq!(list(None).await.len(), 3);
+}
+
+#[tokio::test]
 async fn genre_filter_does_not_duplicate_rows() {
     // The Java needed query.distinct(true) here because it joined; EXISTS cannot duplicate.
     let (_d, pool) = fresh().await;

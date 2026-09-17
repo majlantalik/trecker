@@ -27,7 +27,9 @@ describe('queueParams', () => {
       year: 2010,
       ratingMin: 3,
       ratingMax: 5,
-      didNotFinish: true
+      didNotFinish: true,
+      unlinked: true,
+      withoutCover: true
     }
     const merged = { ...libraryFilters, ...queueParams('newest') }
     for (const key of Object.keys(libraryFilters)) {
