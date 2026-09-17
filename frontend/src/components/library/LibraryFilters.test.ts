@@ -71,3 +71,55 @@ describe('the year filter', () => {
     expect(yearInput(w).attributes('maxlength')).toBe('4')
   })
 })
+
+const lastFilters = (w: Awaited<ReturnType<typeof mountFilters>>) =>
+  w.emitted('update:filters')?.at(-1)?.[0] as ReleaseFilterParams | undefined
+
+async function tickBox(w: Awaited<ReturnType<typeof mountFilters>>, inputId: string, checked: boolean) {
+  const box = w.findAllComponents({ name: 'Checkbox' }).find(c => c.attributes('input-id') === inputId)!
+  box.vm.$emit('update:modelValue', checked)
+  box.vm.$emit('change')
+  await flushPromises()
+}
+
+describe('the MusicBrainz link filter', () => {
+  const tick = (w: Awaited<ReturnType<typeof mountFilters>>, checked: boolean) =>
+    tickBox(w, 'filter-unlinked', checked)
+
+  it('asks for unlinked albums only while ticked', async () => {
+    const w = await mountFilters()
+    await tick(w, true)
+    expect(lastFilters(w)?.unlinked).toBe(true)
+
+    await tick(w, false)
+    expect(lastFilters(w)?.unlinked).toBeUndefined()
+  })
+
+  it('is reset by Clear Filters', async () => {
+    const w = await mountFilters()
+    await tick(w, true)
+    await w.find('.clear-btn').trigger('click')
+    expect(lastFilters(w)?.unlinked).toBeUndefined()
+  })
+})
+
+describe('the cover filter', () => {
+  it('asks for albums without a cover only while ticked, and combines with the link filter', async () => {
+    const w = await mountFilters()
+    await tickBox(w, 'filter-without-cover', true)
+    expect(lastFilters(w)?.withoutCover).toBe(true)
+
+    await tickBox(w, 'filter-unlinked', true)
+    expect(lastFilters(w)).toMatchObject({ withoutCover: true, unlinked: true })
+
+    await tickBox(w, 'filter-without-cover', false)
+    expect(lastFilters(w)?.withoutCover).toBeUndefined()
+  })
+
+  it('is reset by Clear Filters', async () => {
+    const w = await mountFilters()
+    await tickBox(w, 'filter-without-cover', true)
+    await w.find('.clear-btn').trigger('click')
+    expect(lastFilters(w)?.withoutCover).toBeUndefined()
+  })
+})

@@ -25,7 +25,9 @@ export function queueParams(order: QueueSort): ReleaseFilterParams {
     year: undefined,
     ratingMin: undefined,
     ratingMax: undefined,
-    didNotFinish: undefined
+    didNotFinish: undefined,
+    unlinked: undefined,
+    withoutCover: undefined
   }
 }
 
