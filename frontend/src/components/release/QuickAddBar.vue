@@ -70,17 +70,21 @@
 
 <script setup lang="ts">
 import { coverSrc } from '@/api/cache'
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, defineAsyncComponent, ref, watch, onUnmounted } from 'vue'
 import AutoComplete from 'primevue/autocomplete'
 import Button from 'primevue/button'
 import { useToast } from 'primevue/usetoast'
-import ReleaseForm from './ReleaseForm.vue'
-import AlbumPicker from './AlbumPicker.vue'
 import { useAlbumSearch } from '@/composables/useAlbumSearch'
 import { releasesApi } from '@/api/releases'
 import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
 import type { ResolvedMetadata } from '@/types'
+
+// The bar sits in the header of every page, so it is in the entry chunk. These two dialogs
+// open only on demand and would otherwise pull InputNumber, Listbox and the rest of the
+// form into that chunk too.
+const AlbumPicker = defineAsyncComponent(() => import('./AlbumPicker.vue'))
+const ReleaseForm = defineAsyncComponent(() => import('./ReleaseForm.vue'))
 
 const props = withDefaults(
   defineProps<{
