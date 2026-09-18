@@ -202,6 +202,14 @@
             <a :href="url" target="_blank" class="link-chip-label">
               <i class="pi pi-external-link" /> {{ capitalize(String(service)) }}
             </a>
+            <button
+              v-if="desktopAppLink(url)"
+              class="link-chip-app"
+              :title="`Open in ${desktopAppLink(url)!.label} app`"
+              @click="openInApp(desktopAppLink(url)!.uri)"
+            >
+              <i class="pi pi-desktop" />
+            </button>
             <button class="link-chip-remove" @click="removeLink(String(service))">
               <i class="pi pi-times" />
             </button>
@@ -277,7 +285,8 @@ import { releasesApi } from '@/api/releases'
 import { useReleasesStore } from '@/stores/releases'
 import { useGenresStore } from '@/stores/genres'
 import type { AlbumCandidate, Release } from '@/types'
-import { harmonyLookupUrl, streamingService } from '@/utils/links'
+import { harmonyLookupUrl, streamingService, desktopAppLink } from '@/utils/links'
+import { openerApi } from '@/api/opener'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
@@ -514,6 +523,10 @@ async function removeLink(service: string) {
   const links = { ...release.value.streamingLinks }
   delete links[service]
   release.value = await releasesStore.updateRelease(release.value.id, { streamingLinks: links })
+}
+
+async function openInApp(uri: string) {
+  await openerApi.openUri(uri)
 }
 
 function confirmDelete() {
@@ -821,6 +834,22 @@ function capitalize(s: string) {
 
 .link-chip-label:hover {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.link-chip-app {
+  padding: 0.3rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: rgba(226, 228, 240, 0.6);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  border-left: 1px solid var(--tk-border);
+  line-height: 1;
+}
+
+.link-chip-app:hover {
+  color: var(--tk-accent);
+  background: var(--tk-accent-dim);
 }
 
 .link-chip-remove {
