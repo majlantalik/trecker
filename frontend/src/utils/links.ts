@@ -9,6 +9,56 @@ export function streamingService(url: string): string {
   return 'other'
 }
 
+/**
+ * The `spotify:` URI for a share link, so the desktop app can open it directly instead of
+ * the web player. Null for anything that is not a Spotify album/track/playlist/artist link,
+ * including share links whose sharing parameters have not been stripped yet.
+ */
+export function spotifyAppUri(url: string): string | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  if (parsed.hostname !== 'open.spotify.com') return null
+  const match = /^\/(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/.exec(parsed.pathname)
+  if (!match) return null
+  return `spotify:${match[1]}:${match[2]}`
+}
+
+/**
+ * The `tidal://` URI for a share link, matching the format the desktop client (SONE, the
+ * only one registered as a `tidal:` handler on Linux) reads: `tidal://<type>/<id>`, the
+ * type read from the same position as its own share links (`tidal.com/<type>/<id>`, with an
+ * older `/browse/` prefix some links still carry). Null for anything else, including a
+ * video link, which no desktop client here parses.
+ */
+export function tidalAppUri(url: string): string | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  if (parsed.hostname !== 'tidal.com') return null
+  const match = /^\/(?:browse\/)?(track|album|artist|playlist|mix)\/([^/]+)/.exec(parsed.pathname)
+  if (!match) return null
+  return `tidal://${match[1]}/${match[2]}`
+}
+
+/**
+ * The desktop app's own URI for a share link, when one is known, alongside which app it
+ * names in the button that opens it.
+ */
+export function desktopAppLink(url: string): { uri: string; label: string } | null {
+  const spotify = spotifyAppUri(url)
+  if (spotify) return { uri: spotify, label: 'Spotify' }
+  const tidal = tidalAppUri(url)
+  if (tidal) return { uri: tidal, label: 'Tidal' }
+  return null
+}
+
 /** Hosts whose album pages Harmony can read. YouTube is not one of them. */
 const HARMONY_HOSTS = ['spotify.com', 'tidal.com', 'deezer.com', 'music.apple.com', 'itunes.apple.com', 'bandcamp.com', 'beatport.com']
 
