@@ -178,10 +178,14 @@ export type CloseAction = 'quit' | 'tray'
 /** The queue's order, by the date each album was added. */
 export type QueueSort = 'newest' | 'oldest'
 
+/** Where the open-link button sends a streaming link: the browser, or the service's app. */
+export type LinkTarget = 'web' | 'app'
+
 /** Preferences for how the app behaves on this machine. Not part of the library. */
 export interface Settings {
   closeAction: CloseAction
   queueSort: QueueSort
+  openLinksIn: LinkTarget
 }
 
 export type ArtistStatus = 'TO_CHECK' | 'CHECKED'

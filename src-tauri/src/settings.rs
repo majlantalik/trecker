@@ -31,6 +31,18 @@ pub enum QueueSort {
     Oldest,
 }
 
+/// Where the open-link button in the queue and the library sends a streaming link.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LinkTarget {
+    /// The link as stored, in the default browser.
+    #[default]
+    Web,
+    /// The service's desktop app, for services that have one here (Spotify, Tidal). Links
+    /// to anything else still open in the browser.
+    App,
+}
+
 /// Every preference, each with a default, so a file written by an older version, or
 /// missing a field, still reads.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,6 +50,7 @@ pub enum QueueSort {
 pub struct Settings {
     pub close_action: CloseAction,
     pub queue_sort: QueueSort,
+    pub open_links_in: LinkTarget,
 }
 
 pub struct SettingsStore {
@@ -112,9 +125,13 @@ mod tests {
     }
 
     #[test]
-    fn the_queue_order_is_kept_alongside_the_close_action() {
+    fn every_preference_is_kept_together() {
         let dir = tempfile::tempdir().unwrap();
-        let next = Settings { close_action: CloseAction::Tray, queue_sort: QueueSort::Oldest };
+        let next = Settings {
+            close_action: CloseAction::Tray,
+            queue_sort: QueueSort::Oldest,
+            open_links_in: LinkTarget::App,
+        };
         store(&dir).replace(next.clone()).unwrap();
         assert_eq!(store(&dir).get(), next);
     }
@@ -146,6 +163,7 @@ mod tests {
         let newer: Settings = serde_json::from_str(r#"{"closeAction":"tray","theme":"light"}"#).unwrap();
         assert_eq!(newer.close_action, CloseAction::Tray);
         assert_eq!(newer.queue_sort, QueueSort::Newest, "a file from before the queue sort");
+        assert_eq!(newer.open_links_in, LinkTarget::Web, "a file from before the link target");
     }
 
     #[test]
@@ -154,5 +172,7 @@ mod tests {
         assert_eq!(serde_json::from_str::<CloseAction>(r#""tray""#).unwrap(), CloseAction::Tray);
         assert_eq!(serde_json::from_str::<QueueSort>(r#""newest""#).unwrap(), QueueSort::Newest);
         assert_eq!(serde_json::from_str::<QueueSort>(r#""oldest""#).unwrap(), QueueSort::Oldest);
+        assert_eq!(serde_json::from_str::<LinkTarget>(r#""web""#).unwrap(), LinkTarget::Web);
+        assert_eq!(serde_json::from_str::<LinkTarget>(r#""app""#).unwrap(), LinkTarget::App);
     }
 }

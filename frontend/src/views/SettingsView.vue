@@ -62,6 +62,30 @@
 
     <div class="settings-section">
       <div class="section-header">
+        <i class="pi pi-external-link section-icon" />
+        <h2 class="section-title">Links</h2>
+      </div>
+      <div class="section-body">
+        <p class="tk-label">Open streaming links from the queue and the library</p>
+        <div v-for="option in LINK_OPTIONS" :key="option.value" class="choice">
+          <RadioButton
+            :input-id="`links-${option.value}`"
+            name="open-links-in"
+            :value="option.value"
+            :model-value="settings?.openLinksIn"
+            :disabled="!settings || saving"
+            @update:model-value="(value: LinkTarget) => update({ openLinksIn: value })"
+          />
+          <label :for="`links-${option.value}`" class="choice-text">
+            <span class="choice-title">{{ option.title }}</span>
+            <span class="choice-description">{{ option.description }}</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="section-header">
         <i class="pi pi-bolt section-icon" />
         <h2 class="section-title">Quick add from anywhere</h2>
       </div>
@@ -100,7 +124,7 @@ import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { appApi } from '@/api/app'
 import { useSettings } from '@/composables/useSettings'
-import type { CloseAction, QueueSort } from '@/types'
+import type { CloseAction, LinkTarget, QueueSort } from '@/types'
 
 const CLOSE_OPTIONS: { value: CloseAction; title: string; description: string }[] = [
   {
@@ -126,6 +150,20 @@ const QUEUE_OPTIONS: { value: QueueSort; title: string; description: string }[] 
     value: 'oldest',
     title: 'Oldest first',
     description: 'Work through the queue in the order albums arrived.'
+  }
+]
+
+const LINK_OPTIONS: { value: LinkTarget; title: string; description: string }[] = [
+  {
+    value: 'web',
+    title: 'In the browser',
+    description: 'Every link opens its web page.'
+  },
+  {
+    value: 'app',
+    title: 'In the desktop app',
+    description:
+      'Spotify and Tidal links open in their apps. Other links, and any app that cannot be opened, fall back to the browser.'
   }
 ]
 

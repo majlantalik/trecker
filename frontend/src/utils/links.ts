@@ -1,3 +1,5 @@
+import type { LinkTarget } from '@/types'
+
 /**
  * The key a pasted streaming link is stored under in `streamingLinks`. Anything that is not
  * Spotify, Tidal or YouTube is kept as "other".
@@ -57,6 +59,37 @@ export function desktopAppLink(url: string): { uri: string; label: string } | nu
   const tidal = tidalAppUri(url)
   if (tidal) return { uri: tidal, label: 'Tidal' }
   return null
+}
+
+/** What the open-link button opens: the address, a web address to try if that fails, and its label. */
+export interface LinkChoice {
+  uri: string
+  fallback: string | null
+  label: string
+}
+
+/**
+ * What the open-link button opens for an album, or null when it has no streaming link.
+ *
+ * Preferring the app picks the first link a desktop app can open and keeps its web address
+ * as the fallback. When no link has an app, as for a YouTube link, the web link opens
+ * instead, so the preference never leaves the button doing nothing.
+ */
+export function linkToOpen(
+  links: Record<string, string> | null | undefined,
+  target: LinkTarget
+): LinkChoice | null {
+  const entries = Object.entries(links ?? {}).filter(([, url]) => url)
+  if (!entries.length) return null
+  if (target === 'app') {
+    for (const [, url] of entries) {
+      const app = desktopAppLink(url)
+      if (app) return { uri: app.uri, fallback: url, label: `Open in ${app.label} app` }
+    }
+  }
+  const [service, url] = entries[0]
+  const name = service === 'other' ? 'the web' : service.charAt(0).toUpperCase() + service.slice(1)
+  return { uri: url, fallback: null, label: `Open on ${name}` }
 }
 
 /** Hosts whose album pages Harmony can read. YouTube is not one of them. */

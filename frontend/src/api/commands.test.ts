@@ -244,8 +244,8 @@ describe('settings commands', () => {
   })
 
   it('update sends the settings as "request"', async () => {
-    await settingsApi.update({ closeAction: 'tray', queueSort: 'oldest' })
-    expect(invoke).toHaveBeenCalledWith('settings_update', { request: { closeAction: 'tray', queueSort: 'oldest' } })
+    await settingsApi.update({ closeAction: 'tray', queueSort: 'oldest', openLinksIn: 'app' })
+    expect(invoke).toHaveBeenCalledWith('settings_update', { request: { closeAction: 'tray', queueSort: 'oldest', openLinksIn: 'app' } })
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { harmonyLookupUrl, streamingService, spotifyAppUri, tidalAppUri, desktopAppLink } from './links'
+import { harmonyLookupUrl, streamingService, spotifyAppUri, tidalAppUri, desktopAppLink, linkToOpen } from './links'
 
 describe('streamingService', () => {
   it('names the services a link is stored under', () => {
@@ -55,6 +55,38 @@ describe('desktopAppLink', () => {
     expect(desktopAppLink('https://open.spotify.com/album/1')).toEqual({ uri: 'spotify:album:1', label: 'Spotify' })
     expect(desktopAppLink('https://tidal.com/album/1')).toEqual({ uri: 'tidal://album/1', label: 'Tidal' })
     expect(desktopAppLink('https://www.youtube.com/watch?v=x')).toBeNull()
+  })
+})
+
+describe('linkToOpen', () => {
+  const spotify = 'https://open.spotify.com/album/4ZoR'
+  const youtube = 'https://www.youtube.com/playlist?list=OLAK'
+
+  it('has nothing to open without a streaming link', () => {
+    expect(linkToOpen(undefined, 'web')).toBeNull()
+    expect(linkToOpen({}, 'app')).toBeNull()
+    expect(linkToOpen({ spotify: '' }, 'web')).toBeNull()
+  })
+
+  it('opens the web page when the browser is preferred', () => {
+    expect(linkToOpen({ spotify }, 'web')).toEqual({ uri: spotify, fallback: null, label: 'Open on Spotify' })
+    expect(linkToOpen({ other: 'https://x.bandcamp.com/album/y' }, 'web')?.label).toBe('Open on the web')
+  })
+
+  it('opens the app when preferred, keeping the web page to fall back on', () => {
+    expect(linkToOpen({ spotify }, 'app')).toEqual({
+      uri: 'spotify:album:4ZoR',
+      fallback: spotify,
+      label: 'Open in Spotify app'
+    })
+  })
+
+  it('skips to a link that has an app', () => {
+    expect(linkToOpen({ youtube, spotify }, 'app')?.uri).toBe('spotify:album:4ZoR')
+  })
+
+  it('opens the web page when no link has an app, rather than nothing', () => {
+    expect(linkToOpen({ youtube }, 'app')).toEqual({ uri: youtube, fallback: null, label: 'Open on Youtube' })
   })
 })
 

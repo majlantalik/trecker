@@ -15,18 +15,7 @@
       aria-label="Copy artist and album"
       @click="copyAlbum(release)"
     />
-    <template v-for="(url, service) in release.streamingLinks" :key="service">
-      <Button
-        icon="pi pi-external-link"
-        size="small"
-        severity="secondary"
-        text
-        :href="url"
-        tag="a"
-        target="_blank"
-        :aria-label="`Open on ${service}`"
-      />
-    </template>
+    <OpenLinkButton :links="release.streamingLinks" />
     <Button
       icon="pi pi-trash"
       size="small"
@@ -40,6 +29,7 @@
 
 <script setup lang="ts">
 import Button from 'primevue/button'
+import OpenLinkButton from '@/components/common/OpenLinkButton.vue'
 import { useCopyAlbum } from '@/composables/useCopyAlbum'
 import type { Release } from '@/types'
 
