@@ -22,7 +22,7 @@ export function spotifyAppUri(url: string): string | null {
     return null
   }
   if (parsed.hostname !== 'open.spotify.com') return null
-  const match = parsed.pathname.match(/^\/(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/)
+  const match = /^\/(track|album|playlist|artist|episode|show)\/([A-Za-z0-9]+)/.exec(parsed.pathname)
   if (!match) return null
   return `spotify:${match[1]}:${match[2]}`
 }
@@ -42,7 +42,7 @@ export function tidalAppUri(url: string): string | null {
     return null
   }
   if (parsed.hostname !== 'tidal.com') return null
-  const match = parsed.pathname.match(/^\/(?:browse\/)?(track|album|artist|playlist|mix)\/([^/]+)/)
+  const match = /^\/(?:browse\/)?(track|album|artist|playlist|mix)\/([^/]+)/.exec(parsed.pathname)
   if (!match) return null
   return `tidal://${match[1]}/${match[2]}`
 }
