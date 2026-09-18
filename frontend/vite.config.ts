@@ -18,7 +18,21 @@ export default defineConfig({
     // Splitting CSS is a network optimisation and there is no network here; every asset
     // is inside the binary. One file is strictly better: nothing injected at runtime, no
     // ordering to get wrong, and no flash of unstyled content.
-    cssCodeSplit: false
+    cssCodeSplit: false,
+    rollupOptions: {
+      output: {
+        // The framework every page needs at startup, split out of the entry chunk so no
+        // single file passes Vite's 500 kB warning. Only packages the entry already loads
+        // belong here: listing all of @primeuix, say, would pull the styles of components
+        // that only lazy views use, such as DataTable, into startup.
+        manualChunks(id) {
+          if (/node_modules\/(@vue|vue|vue-router|pinia)\//.test(id)) return 'vue'
+          if (/node_modules\/(@primevue\/(core|themes)|@primeuix\/(themes|styled|utils))\//.test(id)) {
+            return 'primevue'
+          }
+        }
+      }
+    }
   },
   // The dev server no longer proxies anything. There is no API to reach.
   server: {},
