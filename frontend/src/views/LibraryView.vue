@@ -62,7 +62,7 @@
               <span class="date-cell">{{ data.dateListened ? formatDate(data.dateListened) : '' }}</span>
             </template>
           </Column>
-          <Column style="width: 116px">
+          <Column style="width: 152px">
             <template #body="{ data }">
               <div class="table-actions">
                 <!-- `.stop`, or the row's own click handler runs on top of the copy. -->
@@ -75,6 +75,7 @@
                   aria-label="Copy artist and album"
                   @click.stop="copyAlbum(data)"
                 />
+                <OpenLinkButton :links="data.streamingLinks" />
                 <Button
                   icon="pi pi-pencil"
                   text
@@ -131,6 +132,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
+import OpenLinkButton from '@/components/common/OpenLinkButton.vue'
 import Button from 'primevue/button'
 import HalfStarRating from '@/components/common/HalfStarRating.vue'
 import CountryLabel from '@/components/common/CountryLabel.vue'

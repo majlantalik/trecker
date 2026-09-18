@@ -341,7 +341,13 @@ have a human press the keys.
 **External links are plain `<a href target="_blank">`.** `tauri-plugin-opener` intercepts the
 click and opens the default browser, which the capability limits to http, https, mailto and
 tel. Without it WebKitGTK opens nothing, silently. Do not import the opener's JavaScript
-into views; the anchor is enough, and the seam stays in `@/api/`.
+into views; the anchor is enough, and the seam stays in `@/api/`. A PrimeVue `Button` given
+an `href` still renders a `<button>` unless it gets `as="a"`, and then opens nothing.
+
+**A streaming link opens through `OpenLinkButton`,** in the queue and the library. It calls
+`openerApi` through `useOpenLink`, because the `openLinksIn` setting can send it to a
+`spotify:` or `tidal://` URI, which an anchor cannot open. It falls back to the web link
+when the app fails. It stays in the row, disabled, when there is no link, so rows line up.
 
 **`@/api/` is the only place that imports Tauri.** `dialog.ts` wraps the file pickers for
 the same reason the others wrap `invoke`: the views and stores stay ordinary Vue and the

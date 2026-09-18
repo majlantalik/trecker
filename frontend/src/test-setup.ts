@@ -10,7 +10,7 @@ config.global.stubs = {
     emits: ['update:visible']
   },
   Button: {
-    template: '<button :data-label="label" @click="$emit(\'click\')"><slot /></button>',
+    template: '<button :data-label="label" @click="$emit(\'click\', $event)"><slot /></button>',
     props: ['label', 'loading', 'severity', 'outlined', 'icon', 'type'],
     emits: ['click']
   },

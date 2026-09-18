@@ -9,7 +9,7 @@ const { queueParams, useQueueSort } = await import('./useQueueSort')
 
 beforeEach(() => {
   vi.clearAllMocks()
-  get.mockResolvedValue({ closeAction: 'tray', queueSort: 'oldest' })
+  get.mockResolvedValue({ closeAction: 'tray', queueSort: 'oldest', openLinksIn: 'web' })
   update.mockImplementation(async (s) => s)
 })
 
@@ -53,7 +53,7 @@ describe('useQueueSort', () => {
     const q = useQueueSort()
     await q.load()
     expect(await q.toggle()).toBeNull()
-    expect(update).toHaveBeenCalledWith({ closeAction: 'tray', queueSort: 'newest' })
+    expect(update).toHaveBeenCalledWith({ closeAction: 'tray', queueSort: 'newest', openLinksIn: 'web' })
     expect(q.sort.value).toBe('newest')
   })
 
